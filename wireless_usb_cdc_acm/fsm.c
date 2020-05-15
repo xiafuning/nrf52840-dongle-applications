@@ -6,7 +6,7 @@
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
  *
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
  *
@@ -26,7 +26,7 @@
  * 5. Any software provided in binary form under this license must not be reverse
  *    engineered, decompiled, modified and/or disassembled.
  *
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -426,7 +426,7 @@ static void a_radio_tx_start(void * p_data)
     size_t sz = hal_uart_read_buffer_size_get(p_descr);
     //LEDS_OFF(BIT(CONFIG_UPSTREAM_PIN));
 	*/
-    
+
 	// XFN_CHANGE
 	app_usbd_cdc_acm_t const * p_usb_cdc_acm = usb_cdc_acm_inst_get();
 	size_t size = 0;
@@ -436,14 +436,14 @@ static void a_radio_tx_start(void * p_data)
 	if ((app_usbd_cdc_acm_bytes_stored(p_usb_cdc_acm) > 0) || ((app_usbd_cdc_acm_bytes_stored(p_usb_cdc_acm) == 0) && m_rx_buffer[0] != 0))
 	{
 		do
-		{                
-			memcpy(&m_radio_tx_buffer[PAYLOAD_START_POSITION + size], &m_rx_buffer[0], READ_SIZE);		
+		{
+			memcpy(&m_radio_tx_buffer[PAYLOAD_START_POSITION + size], &m_rx_buffer[0], READ_SIZE);
 			size++;
 			if (size == MAX_MSDU_SIZE)
-    		{
-        		break;
-    		}
-	   		/* Fetch data until internal buffer is empty */             
+			{
+				break;
+			}
+			/* Fetch data until internal buffer is empty */
 			ret = app_usbd_cdc_acm_read(p_usb_cdc_acm, m_rx_buffer, READ_SIZE);
 		}
 		while (ret == NRF_SUCCESS);
@@ -456,7 +456,7 @@ static void a_radio_tx_start(void * p_data)
         memcpy(m_radio_tx_buffer_shadow, &m_radio_tx_buffer[COUNTER_POSITION],
                                             size + MAX_APP_SEQUENCE_NUMBER_SIZE);
 #endif
-		
+
 		// radio mac configuration
         m_data_req.dst_addr_mode = MAC_ADDR_SHORT;
         m_data_req.dst_addr.short_address = CONFIG_BROADCAST_ADDRESS;
@@ -472,9 +472,8 @@ static void a_radio_tx_start(void * p_data)
         m_data_req.security_level = CONFIG_DATA_SECURITY_LEVEL;
         m_data_req.key_id_mode = 0;
 #endif
-		// raise a request to transfer a data SPDU (i.e., MSDU)        
+		// raise a request to transfer a data SPDU (i.e., MSDU)
 		mcps_data_req(&m_data_req, mcps_data_conf);
-        
         //LEDS_ON(BIT(CONFIG_UPSTREAM_PIN));
     }
     else
@@ -583,7 +582,7 @@ static void mcps_data_conf(mcps_data_conf_t * conf)
     if (conf->status == MAC_SUCCESS)
     {
         tx_sequence_number++;
-		bsp_board_led_invert(LED_CDC_ACM_TX);	
+		bsp_board_led_invert(LED_CDC_ACM_TX);
 	}
     fsm_event_post(E_RADIO_TX_DONE, &data);
     //LEDS_OFF(BIT(CONFIG_UPSTREAM_PIN));
@@ -692,9 +691,3 @@ static bool gu_usb_cdc_acm_tx_idle(void * p_data)
 {
     return m_usb_cdc_acm_tx_idle;
 }
-
-
-
-
-
-

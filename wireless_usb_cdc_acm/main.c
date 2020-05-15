@@ -6,7 +6,7 @@
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
  *
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
  *
@@ -26,7 +26,7 @@
  * 5. Any software provided in binary form under this license must not be reverse
  *    engineered, decompiled, modified and/or disassembled.
  *
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY NORDIC SEMICONDUCTOR ASA "AS IS" AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY, NONINFRINGEMENT, AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -188,7 +188,6 @@ int main(void)
 
     while (true)
     {
-				
 		while (app_usbd_event_queue_process())
         {
             /* Nothing to do, but necessary for USB CDC ACM */
@@ -196,4 +195,3 @@ int main(void)
 		sys_task_run();
     }
 }
-

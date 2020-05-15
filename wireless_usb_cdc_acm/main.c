@@ -88,10 +88,11 @@ void mcps_data_ind(mcps_data_ind_t * p_ind)
 
     bool addresses_match = p_ind->dst_pan_id == CONFIG_PAN_ID &&
                            p_ind->dst_addr_mode == MAC_ADDR_SHORT &&
-                           p_ind->dst_addr.short_address == CONFIG_DEVICE_SHORT_ADDRESS &&
+                           (p_ind->dst_addr.short_address == CONFIG_DEVICE_SHORT_ADDRESS ||
+                            p_ind->dst_addr.short_address == CONFIG_BROADCAST_ADDRESS) &&
                            p_ind->src_pan_id == CONFIG_PAN_ID &&
                            p_ind->src_addr_mode == MAC_ADDR_SHORT &&
-                           p_ind->src_addr.short_address == CONFIG_OTHER_ADDRESS;
+                           p_ind->src_addr.short_address != CONFIG_DEVICE_SHORT_ADDRESS;
 
     rx_counter = p_ind->msdu.p_payload[0];
     if ((rx_counter != app_rx_counter || first_frame) && addresses_match && (p_ind->msdu_length > 0))

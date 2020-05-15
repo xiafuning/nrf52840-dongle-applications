@@ -54,9 +54,9 @@
 #define CONFIG_DEVICE_SHORT_ADDRESS 10
 #endif
 
-// <o> CONFIG_OTHER_ADDRESS - Peer device short address 
-#ifndef CONFIG_OTHER_ADDRESS
-#define CONFIG_OTHER_ADDRESS 11
+// <o> CONFIG_BROADCAST_ADDRESS - Broadcast short address
+#ifndef CONFIG_BROADCAST_ADDRESS
+#define CONFIG_BROADCAST_ADDRESS 0xFFFF
 #endif
 
 // <o> CONFIG_OTHER_ADDRESS - Peer device short address 

@@ -8,7 +8,7 @@ $ make -f examples/Makefile-nrf52840 clean
 $ make -f examples/Makefile-nrf52840 USB=1 BOOTLOADER=USB JOINER=1               
 ```
 
-Use the following command to compile the NCP joiner
+Use the following command to compile the Full Thread Devices (FTDs)
 ```bash
 $ make -f examples/Makefile-nrf52840 clean
 $ make -f examples/Makefile-nrf52840 USB=1 BOOTLOADER=USB JOINER=1 COMMISSIONER=1

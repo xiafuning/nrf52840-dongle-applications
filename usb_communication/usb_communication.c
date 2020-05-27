@@ -1,14 +1,31 @@
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h> 
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include "serial.h"
 
 #define USB_DEVICE "/dev/ttyACM0"
 #define MAX_SIZE 128
+
+static struct option long_options[] =
+{
+	{"port", required_argument, 0, 'p'},
+	{"mode", required_argument, 0, 'm'},
+	{"help", no_argument, 		0, 'h'},
+	{0, 0, 0, 0}
+};
+
+void usage(void)
+{
+	printf ("Usage: [-p --port <serial port number>] [-m --mode <mode>] [-h --help]\n");
+	printf ("Options:\n");
+	printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
+	printf ("\t-m --mode\trunning mode\t\t\tOptions: client/server/echo\n");
+	printf ("\t-h --help\tthis help documetation\n");
+}
 
 
 int main(int argc, char *argv[])
@@ -18,21 +35,53 @@ int main(int argc, char *argv[])
 	bool client = false;
 	bool server = false;
 	bool echo = false;
+	char* serial_port = (char*)USB_DEVICE;
 
-	if (!strcmp(argv[2], "client"))
-		client = true;
-	else if (!strcmp(argv[2], "server"))
-		server = true;
-	else if (!strcmp(argv[2], "echo"))
-		echo = true;
-	else
-		fprintf (stderr, "error: unknown mode %s\n", argv[2]);
-	
+	// cmd arguments parsing
+	int opt;
+	int option_index = 0;
 
-	int fd = open_serial_port (argv[1], B115200, 0);
+	if (argc == 1)
+	{
+		usage();
+		return 0;
+	}
+
+	while ((opt = getopt_long (argc, argv, "p:m:h", long_options, &option_index)) != -1)
+	{
+		switch (opt)
+		{
+			case 'p':
+				serial_port = optarg;
+				break;
+			case 'm':
+				if (!strcmp(optarg, "client"))
+					client = true;
+				else if (!strcmp(optarg, "server"))
+					server = true;
+				else if (!strcmp(optarg, "echo"))
+					echo = true;
+				else
+				{
+					fprintf (stderr, "error: unknown mode %s\n", optarg);
+					return -1;
+				}
+				break;
+			case 'h':
+				usage();
+				return 0;
+				break;
+			default:
+				usage();
+				break;
+		}
+	}
+
+	// USB communication
+	int fd = open_serial_port (serial_port, B115200, 0);
 	if (fd < 0)
 	{
-		fprintf (stderr, "error %d opening %s: %s\n", errno, USB_DEVICE, strerror (errno));
+		fprintf (stderr, "error %d opening %s: %s\n", errno, serial_port, strerror (errno));
 		return -1;
 	}
 

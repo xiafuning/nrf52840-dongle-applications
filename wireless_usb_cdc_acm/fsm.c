@@ -251,8 +251,8 @@ static const fsm_guard_t m_fsm_guards[] =
     gu_uart_tx_data_available,
     gu_radio_tx_idle,
     gu_uart_tx_idle,
-    gu_usb_cdc_acm_tx_data_available,	// XFN_CHANGE
     gu_usb_cdc_acm_tx_idle,				// XFN_CHANGE
+    gu_usb_cdc_acm_tx_data_available,	// XFN_CHANGE
 };
 
 static const fsm_action_t m_fsm_actions[] =
@@ -670,7 +670,7 @@ static void a_usb_cdc_acm_tx_start(void * p_data)
 
     mac_mem_msdu_free(&p_fsm_frame->payload_descr);
 
-    //m_usb_cdc_acm_tx_idle = false;
+    m_usb_cdc_acm_tx_idle = false;
 
     //LEDS_ON(BIT(CONFIG_DOWNSTREAM_PIN));
 
@@ -684,7 +684,10 @@ static void a_usb_cdc_acm_tx_idle_set(void * p_data)
 
 static bool gu_usb_cdc_acm_tx_data_available(void * p_data)
 {
-    return frames_available();
+    bool ret = frames_available();
+    if (ret != true)
+        m_usb_cdc_acm_tx_idle = true;
+    return ret;
 }
 
 static bool gu_usb_cdc_acm_tx_idle(void * p_data)

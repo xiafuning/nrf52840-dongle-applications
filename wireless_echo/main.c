@@ -182,7 +182,7 @@ int main(void)
 	clock_init();
 
 	// set radio output power
-	uint8_t txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+	uint8_t txpower = RADIO_TXPOWER_TXPOWER_Pos8dBm;
     NRF_RADIO->TXPOWER = (txpower << RADIO_TXPOWER_TXPOWER_Pos);
     
 	app_task_init();

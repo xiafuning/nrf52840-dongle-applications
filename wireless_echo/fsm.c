@@ -586,6 +586,7 @@ static void mcps_data_ind_store(fsm_event_data_t * p_data)
 
     fsm_frame.payload_descr = p_frame->msdu;
     fsm_frame.length        = p_frame->msdu_length;
+	bsp_board_led_invert(LED_CDC_ACM_RX);
     frame_store(&fsm_frame);
 }
 

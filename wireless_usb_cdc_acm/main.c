@@ -81,9 +81,6 @@ static sys_event_desc_t m_memory_freed_desc =
  */
 void mcps_data_ind(mcps_data_ind_t * p_ind)
 {
-    static uint8_t    app_rx_counter = 0;
-    static bool       first_frame = true;
-    sequence_number_t next_counter_val = app_rx_counter + 1;
     sequence_number_t rx_counter = 0;
 
     bool addresses_match = p_ind->dst_pan_id == CONFIG_PAN_ID &&
@@ -95,17 +92,8 @@ void mcps_data_ind(mcps_data_ind_t * p_ind)
                            p_ind->src_addr.short_address != CONFIG_DEVICE_SHORT_ADDRESS;
 
     rx_counter = p_ind->msdu.p_payload[0];
-    if ((rx_counter != app_rx_counter || first_frame) && addresses_match && (p_ind->msdu_length > 0))
+    if (addresses_match && (p_ind->msdu_length > 5))
     {
-        if (first_frame == false)
-        {
-            ASSERT_INFO(next_counter_val == rx_counter,"Number of lost frames: %d", rx_counter - next_counter_val);
-            (void)next_counter_val;
-        }
-        first_frame = false;
-
-        app_rx_counter = rx_counter;
-
         fsm_event_data_t data =
         {
             .mcps_data_ind = p_ind,
@@ -183,7 +171,11 @@ int main(void)
 
 	clock_init();
 
-    app_task_init();
+	// set radio output power
+	uint8_t txpower = RADIO_TXPOWER_TXPOWER_Neg20dBm;
+    NRF_RADIO->TXPOWER = (txpower << RADIO_TXPOWER_TXPOWER_Pos);
+
+	app_task_init();
     sys_task_post(APP_TASK_ID);
 
     while (true)

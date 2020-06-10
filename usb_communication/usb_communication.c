@@ -85,24 +85,42 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	int tx_counter = 0;
+    int rx_num;
+    int tx_ret;
 	while (true)
 	{
 		if (client || echo)
 		{
 			printf ("enter a value :");
 			scanf("%[^\n]%*c", str);
-			write (fd, str, strlen(str));
+			tx_ret = write (fd, str, strlen(str));
+            if (tx_ret > 0)
+            {
+			    printf ("%d write %d bytes\n", tx_counter, tx_ret);
+                tx_counter++;
+            }
+            else
+            {
+                fprintf (stderr, "error %d write fail: %s\n", errno, strerror (errno));
+                break;
+            }
 		}
 		usleep(1000);
 		if (server || echo)
 		{
-			int rx_num = read (fd, rx_buf, MAX_SIZE);
+			rx_num = read (fd, rx_buf, MAX_SIZE);
 			if (rx_num > 0)
 			{
 				printf ("receive %d bytes: %s\n", rx_num, rx_buf);
 				// clear rx buffer after processing
 				memset (rx_buf, 0, sizeof rx_buf);
 			}
+            else if (rx_num == -1)
+            {
+                fprintf (stderr, "error %d read fail: %s\n", errno, strerror (errno));
+                break;
+            }
 		}
 	}
 	return 0;

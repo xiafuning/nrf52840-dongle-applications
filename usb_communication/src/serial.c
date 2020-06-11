@@ -9,73 +9,73 @@
 
 int open_serial_port (char* port, int speed, int parity)
 {
-	int fd = open (port, O_RDWR | O_NOCTTY | O_SYNC);
-	if (fd < 0)
-	{
-		fprintf (stderr, "error %d opening %s: %s\n", errno, port, strerror (errno));
-		return -1;
-	}
+    int fd = open (port, O_RDWR | O_NOCTTY | O_SYNC);
+    if (fd < 0)
+    {
+        fprintf (stderr, "error %d opening %s: %s\n", errno, port, strerror (errno));
+        return -1;
+    }
 
-	set_interface_attributes (fd, speed, parity);  // set speed to 115,200 bps, 8n1 (no parity)
-	set_blocking (fd, 0);                		// set no blocking
+    set_interface_attributes (fd, speed, parity);  // set speed to 115,200 bps, 8n1 (no parity)
+    set_blocking (fd, 0);                       // set no blocking
 
-	return fd;
+    return fd;
 }
 
 int set_interface_attributes (int fd, int speed, int parity)
 {
-	struct termios tty;
-	memset(&tty, 0, sizeof tty);
-	if (tcgetattr (fd, &tty) != 0)
-	{
-		fprintf (stderr, "error %d from tcgetattr\n", errno);
-		return -1;
-	}
+    struct termios tty;
+    memset(&tty, 0, sizeof tty);
+    if (tcgetattr (fd, &tty) != 0)
+    {
+        fprintf (stderr, "error %d from tcgetattr\n", errno);
+        return -1;
+    }
 
-	cfsetospeed (&tty, speed);
+    cfsetospeed (&tty, speed);
 
-	tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
-	tty.c_iflag &= ~IGNBRK;         				// disable break processing
-	tty.c_lflag &= ~ICANON;							// disable canonical mode
-	tty.c_lflag &= ~ECHO; 							// disable echo
-	tty.c_lflag &= ~ISIG; 							// disable interpretation of INTR, QUIT and SUSP
-	tty.c_oflag = 0;                				// no remapping, no delays
-	tty.c_cc[VMIN]  = 0;            				// read doesn't block
-	tty.c_cc[VTIME] = 1;            				// 0.1 seconds read timeout
+    tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
+    tty.c_iflag &= ~IGNBRK;                         // disable break processing
+    tty.c_lflag &= ~ICANON;                         // disable canonical mode
+    tty.c_lflag &= ~ECHO;                           // disable echo
+    tty.c_lflag &= ~ISIG;                           // disable interpretation of INTR, QUIT and SUSP
+    tty.c_oflag = 0;                                // no remapping, no delays
+    tty.c_cc[VMIN]  = 0;                            // read doesn't block
+    tty.c_cc[VTIME] = 1;                            // 0.1 seconds read timeout
 
-	tty.c_iflag &= ~(IXON | IXOFF | IXANY); 		// shut off xon/xoff ctrl
-	tty.c_cflag |= (CLOCAL | CREAD);				// ignore modem controls, enable reading
-	tty.c_cflag &= ~(PARENB | PARODD);      		// shut off parity
-	tty.c_cflag |= parity;
-	tty.c_cflag &= ~CSTOPB;							// clear stop field(only one stop bit)
-	tty.c_cflag &= ~CRTSCTS;						// disable RTS/CTS hardware flow control
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);         // shut off xon/xoff ctrl
+    tty.c_cflag |= (CLOCAL | CREAD);                // ignore modem controls, enable reading
+    tty.c_cflag &= ~(PARENB | PARODD);              // shut off parity
+    tty.c_cflag |= parity;
+    tty.c_cflag &= ~CSTOPB;                         // clear stop field(only one stop bit)
+    tty.c_cflag &= ~CRTSCTS;                        // disable RTS/CTS hardware flow control
 
-	tty.c_oflag &= ~OPOST;
-	tty.c_oflag &= ~ONLCR;
+    tty.c_oflag &= ~OPOST;
+    tty.c_oflag &= ~ONLCR;
 
-	// save tty settings and check for error
-	if (tcsetattr (fd, TCSANOW, &tty) != 0)
-	{
-		fprintf (stderr, "error %d from tcsetattr\n", errno);
-		return -1;
-	}
-	return 0;
+    // save tty settings and check for error
+    if (tcsetattr (fd, TCSANOW, &tty) != 0)
+    {
+        fprintf (stderr, "error %d from tcsetattr\n", errno);
+        return -1;
+    }
+    return 0;
 }
 
 void set_blocking (int fd, int should_block)
 {
-	struct termios tty;
-	memset (&tty, 0, sizeof tty);
-	if (tcgetattr (fd, &tty) != 0)
-	{
-		fprintf (stderr, "error %d from tggetattr\n", errno);
-		return;
-	}
+    struct termios tty;
+    memset (&tty, 0, sizeof tty);
+    if (tcgetattr (fd, &tty) != 0)
+    {
+        fprintf (stderr, "error %d from tggetattr\n", errno);
+        return;
+    }
 
-	tty.c_cc[VMIN]  = should_block ? 1 : 0;
-	tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
+    tty.c_cc[VMIN]  = should_block ? 1 : 0;
+    tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
 
-	if (tcsetattr (fd, TCSANOW, &tty) != 0)
-		fprintf (stderr, "error %d setting term attributes\n", errno);
+    if (tcsetattr (fd, TCSANOW, &tty) != 0)
+        fprintf (stderr, "error %d setting term attributes\n", errno);
 }
 

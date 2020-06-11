@@ -4,13 +4,13 @@
 SRC_DIR		:= src
 INC_DIR		:= include
 LIB_DIR		:=
-TARGETS		:= usb_comm_out
 OUTPUT_DIR	:= build
 
 CC 			:= g++
 CFLAGS 		:= -g3 -Wall -std=c++11 -lpthread -Werror
 
-SRC_FILES 	:= $(wildcard *.c ./$(SRC_DIR)/*.c)
+SRC_FILES 	+= $(wildcard ./$(SRC_DIR)/*.c)
+SRC_FILES 	+= $(TARGETS).c
 OBJS		:= $(patsubst %.c, %.o, $(notdir $(SRC_FILES)))
 
 $(TARGETS) : $(OBJS)

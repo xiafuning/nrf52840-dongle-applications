@@ -79,3 +79,15 @@ void set_blocking (int fd, int should_block)
         fprintf (stderr, "error %d setting term attributes\n", errno);
 }
 
+int write_serial_port (int fd, char* data, int length)
+{
+    int ret;
+    ret = write (fd, data, length);
+    if (ret < 0)
+    {
+        fprintf (stderr, "error %d write fail: %s\n", errno, strerror (errno));
+        return -1;
+    }
+    else
+        return 0;
+}

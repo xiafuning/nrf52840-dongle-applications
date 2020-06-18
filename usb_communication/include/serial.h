@@ -7,4 +7,6 @@ int set_interface_attributes (int fd, int speed, int parity);
 
 void set_blocking (int fd, int should_block);
 
+int write_serial_port (int fd, char* data, int length);
+
 #endif /* SERIAL_H */

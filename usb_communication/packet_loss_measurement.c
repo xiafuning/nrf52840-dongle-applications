@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     char rx_buf[MAX_SIZE];
     bool client = false;
     bool server = false;
+    bool relay = false;
     char* serial_port = (char*)USB_DEVICE;
 
     memset (str, 0, sizeof str);
@@ -65,6 +66,11 @@ int main(int argc, char *argv[])
                     client = true;
                 else if (!strcmp (optarg, "server"))
                     server = true;
+                else if (!strcmp (optarg, "relay"))
+                {
+                    server = true;
+                    relay = true;
+                }
                 else
                 {
                     fprintf (stderr, "error: unknown mode %s\n", optarg);
@@ -94,19 +100,16 @@ int main(int argc, char *argv[])
     uint32_t payload_length = 4;
     uint32_t rx_counter = 0;
     uint32_t inter_packet_interval = 10000; // inter packet interval in us
+    int ret;
 
     if (client)
     {
-        int ret;
         for (uint32_t i = 0; i < num_packets; ++i)
         {
             generate_random_payload (str, payload_length, seq);
-            ret = write (fd, str, 4 + 8 + payload_length);
+            ret = write_serial_port (fd, str, 4 + 8 + payload_length);
             if (ret < 0)
-            {
-                fprintf (stderr, "error %d write fail: %s\n", errno, strerror (errno));
-                break;
-            }
+                return -1;
             memset (str, 0, sizeof str);
             printf ("send packet %u\n", seq);
             seq++;
@@ -138,6 +141,12 @@ int main(int argc, char *argv[])
                 rx_counter++;
                 if (first_packet == false)
                     first_packet = true;
+                if (relay)
+                {
+                    ret = write_serial_port (fd, rx_buf, rx_num);
+                    if (ret < 0)
+                        return -1;
+                }
                 // clear rx buffer after processing
                 memset (rx_buf, 0, sizeof rx_buf);
             }

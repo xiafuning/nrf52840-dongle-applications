@@ -459,7 +459,7 @@ static void a_radio_tx_start(void * p_data)
 
 		// radio mac configuration
         m_data_req.dst_addr_mode = MAC_ADDR_SHORT;
-        m_data_req.dst_addr.short_address = CONFIG_BROADCAST_ADDRESS;
+        m_data_req.dst_addr.short_address = CONFIG_OTHER_ADDRESS;
         m_data_req.dst_pan_id = CONFIG_PAN_ID;
         m_data_req.src_addr_mode = MAC_ADDR_SHORT;
         m_data_req.msdu = (uint8_t *)&m_radio_tx_buffer[MAC_MAX_MHR_SIZE];

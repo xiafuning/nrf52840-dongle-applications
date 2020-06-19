@@ -61,7 +61,7 @@
 
 // <o> CONFIG_OTHER_ADDRESS - Peer device short address 
 #ifndef CONFIG_OTHER_ADDRESS
-#define CONFIG_OTHER_ADDRESS 10
+#define CONFIG_OTHER_ADDRESS 12
 #endif
 
 // </h> 

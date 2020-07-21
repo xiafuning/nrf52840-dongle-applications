@@ -1,0 +1,8 @@
+#! /usr/bin/env python
+# encoding: utf-8
+
+bld.program(features='cxx',
+            source='encode_recode_decode_test.cpp',
+            target='encode_recode_decode_test',
+            install_path=None,
+            use=['kodo_rlnc'])

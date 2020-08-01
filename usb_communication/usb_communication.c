@@ -96,17 +96,9 @@ int main(int argc, char *argv[])
             //printf ("send: %s\n", str);
             //printf ("enter a value :");
             //scanf("%[^\n]%*c", str);
-            tx_ret = write (fd, str, strlen(str));
-            if (tx_ret > 0)
-            {
-                printf ("%d write %d bytes\n", tx_counter, tx_ret);
-                tx_counter++;
-            }
-            else
-            {
-                fprintf (stderr, "error %d write fail: %s\n", errno, strerror (errno));
-                break;
-            }
+            tx_ret = write_serial_port (fd, str, strlen(str));
+            if (tx_ret < 0)
+                return -1;
         }
         usleep(1000);
         if (server || echo)

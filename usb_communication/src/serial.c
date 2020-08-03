@@ -7,6 +7,9 @@
 
 #include "serial.h"
 
+// variable definitions
+static tx_buf_t m_tx_buf;
+
 int open_serial_port (char* port, int speed, int parity)
 {
     int fd = open (port, O_RDWR | O_NOCTTY | O_SYNC);
@@ -90,4 +93,20 @@ int write_serial_port (int fd, char* data, int length)
     }
     else
         return 0;
+}
+
+bool need_serial_fragmentation (int length)
+{
+    return (length > 64);
+}
+
+tx_buf_t* serial_fragmentation (char* data, int length)
+{
+    memset (&m_tx_buf, 0, sizeof m_tx_buf);
+    // set serial fragment indicator
+    m_tx_buf.buf_0[0] = 1;
+    m_tx_buf.buf_1[0] = 2;
+    memcpy (&m_tx_buf.buf_0[1], data, 63);
+    memcpy (&m_tx_buf.buf_1[1], data + 63, length - 63);
+    return &m_tx_buf;
 }

@@ -59,6 +59,7 @@
 
 #include "app_usbd_cdc_acm.h"	// XFN_CHANGE
 #include "bsp.h"				// XFN_CHANGE
+#include "serial.h"
 
 #define LED_USB_RESUME      (BSP_BOARD_LED_0)
 #define LED_CDC_ACM_OPEN    (BSP_BOARD_LED_1)
@@ -221,6 +222,9 @@ static mcps_data_req_t m_data_req;
 static mcps_data_conf_t m_data_conf;
 static bool m_uart_tx_idle = true;
 static bool m_usb_cdc_acm_tx_idle = true;	// XFN_CHANGE
+
+static size_t m_radio_tx_size = 0;          // XFN_CHANGE
+
 static bool m_radio_tx_idle = true;
 static uint8_t m_radio_tx_buffer[PHY_MAX_PACKET_SIZE + MAC_MAX_MHR_SIZE];
 static sequence_number_t tx_sequence_number = 0;
@@ -429,26 +433,71 @@ static void a_radio_tx_start(void * p_data)
 
 	// XFN_CHANGE
 	app_usbd_cdc_acm_t const * p_usb_cdc_acm = usb_cdc_acm_inst_get();
-	size_t size = 0;
 	ret_code_t ret;
 	extern char m_rx_buffer[];
 
-	if ((app_usbd_cdc_acm_bytes_stored(p_usb_cdc_acm) > 0) || ((app_usbd_cdc_acm_bytes_stored(p_usb_cdc_acm) == 0) && m_rx_buffer[0] != 0))
+	if ((app_usbd_cdc_acm_bytes_stored(p_usb_cdc_acm) > 0) ||
+        ((app_usbd_cdc_acm_bytes_stored(p_usb_cdc_acm) == 0) && m_rx_buffer[0] != 0))
 	{
-		do
-		{
-			memcpy(&m_radio_tx_buffer[PAYLOAD_START_POSITION + size], &m_rx_buffer[0], READ_SIZE);
-			size++;
-			if (size == MAX_MSDU_SIZE)
-			{
-				break;
-			}
-			/* Fetch data until internal buffer is empty */
-			ret = app_usbd_cdc_acm_read(p_usb_cdc_acm, m_rx_buffer, READ_SIZE);
-		}
-		while (ret == NRF_SUCCESS);
-		// reset rx buffer
-		memset (m_rx_buffer, 0, sizeof m_rx_buffer);
+		if (m_rx_buffer[0] == 1) // receive first serial fragment
+        {
+            bsp_board_led_invert(LED_CDC_ACM_OPEN);
+            m_radio_tx_size = 0;
+            memset (m_radio_tx_buffer, 0, sizeof m_radio_tx_buffer);
+            do
+		    {
+                /* Fetch data until internal buffer is empty */
+			    ret = app_usbd_cdc_acm_read(p_usb_cdc_acm, m_rx_buffer, READ_SIZE);
+
+			    memcpy(&m_radio_tx_buffer[PAYLOAD_START_POSITION + m_radio_tx_size], &m_rx_buffer[0], READ_SIZE);
+			    m_radio_tx_size++;
+			    if (m_radio_tx_size == MAX_MSDU_SIZE)
+				    break;
+		    }
+		    while (ret == NRF_SUCCESS);
+            // bias adjustment
+            m_radio_tx_size--;
+            // reset rx buffer
+		    memset (m_rx_buffer, 0, sizeof m_rx_buffer);
+            fsm_event_post(E_RADIO_TX_DONE, NULL);
+            return;
+        }
+        else if (m_rx_buffer[0] == 2) // receive second serial fragment
+        {
+            bsp_board_led_invert(LED_CDC_ACM_OPEN);
+            do
+		    {
+                /* Fetch data until internal buffer is empty */
+			    ret = app_usbd_cdc_acm_read(p_usb_cdc_acm, m_rx_buffer, READ_SIZE);
+
+			    memcpy(&m_radio_tx_buffer[PAYLOAD_START_POSITION + m_radio_tx_size], &m_rx_buffer[0], READ_SIZE);
+			    m_radio_tx_size++;
+			    if (m_radio_tx_size == MAX_MSDU_SIZE)
+		        	break;
+		    }
+		    while (ret == NRF_SUCCESS);
+            // bias adjustment
+            m_radio_tx_size--;
+            // reset rx buffer
+		    memset (m_rx_buffer, 0, sizeof m_rx_buffer);
+        }
+        else // receive normal payload
+        {
+            m_radio_tx_size = 0;
+            memset (m_radio_tx_buffer, 0, sizeof m_radio_tx_buffer);
+            do
+            {
+        	    memcpy(&m_radio_tx_buffer[PAYLOAD_START_POSITION + m_radio_tx_size], &m_rx_buffer[0], READ_SIZE);
+			    m_radio_tx_size++;
+			    if (m_radio_tx_size == MAX_MSDU_SIZE)
+				    break;
+			    /* Fetch data until internal buffer is empty */
+			    ret = app_usbd_cdc_acm_read(p_usb_cdc_acm, m_rx_buffer, READ_SIZE);
+            }
+            while (ret == NRF_SUCCESS);
+            // reset rx buffer
+		    memset (m_rx_buffer, 0, sizeof m_rx_buffer);
+        }
 
 		// copy sequence number
         memcpy(&m_radio_tx_buffer[COUNTER_POSITION], &tx_sequence_number, MAX_APP_SEQUENCE_NUMBER_SIZE);
@@ -463,7 +512,7 @@ static void a_radio_tx_start(void * p_data)
         m_data_req.dst_pan_id = CONFIG_PAN_ID;
         m_data_req.src_addr_mode = MAC_ADDR_SHORT;
         m_data_req.msdu = (uint8_t *)&m_radio_tx_buffer[MAC_MAX_MHR_SIZE];
-        m_data_req.msdu_length = size + MAX_APP_SEQUENCE_NUMBER_SIZE;
+        m_data_req.msdu_length = m_radio_tx_size + MAX_APP_SEQUENCE_NUMBER_SIZE;
         m_data_req.msdu_handle++;
         m_data_req.tx_options.ack = false;	// XFN_CHANGE, original value: true
         m_data_req.tx_options.gts = false;
@@ -611,7 +660,8 @@ static void mcps_data_ind_store(fsm_event_data_t * p_data)
 
 static void mcps_data_conf_store(fsm_event_data_t * p_data)
 {
-    m_data_conf = *p_data->mcps_data_conf;
+    if (p_data != NULL)
+        m_data_conf = *p_data->mcps_data_conf;
 }
 
 /* interface functions */
@@ -660,13 +710,24 @@ void fsm_event_scheduler_run(void)
 static void a_usb_cdc_acm_tx_start(void * p_data)
 {
     ASSERT(frames_available());
+    extern bool m_serial_frag_flag;
 
     fsm_frame_item_t * p_fsm_frame = next_frame_get();
 
 	app_usbd_cdc_acm_t const * p_usb_cdc_acm = usb_cdc_acm_inst_get();
-	app_usbd_cdc_acm_write(p_usb_cdc_acm,
-						   p_fsm_frame->payload_descr.p_payload + MAX_APP_SEQUENCE_NUMBER_SIZE,
-						   p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE);
+
+    if (need_serial_fragmentation (p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE) == true)
+    {
+        m_serial_frag_flag = true;
+        tx_buf_t* tx_buffer = serial_fragmentation (p_fsm_frame->payload_descr.p_payload + MAX_APP_SEQUENCE_NUMBER_SIZE,
+                                                    p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE);
+        // send first fragment
+        app_usbd_cdc_acm_write (p_usb_cdc_acm, tx_buffer->buf_0, 64);
+    }
+    else
+	    app_usbd_cdc_acm_write(p_usb_cdc_acm,
+						       p_fsm_frame->payload_descr.p_payload + MAX_APP_SEQUENCE_NUMBER_SIZE,
+						       p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE);
 
     mac_mem_msdu_free(&p_fsm_frame->payload_descr);
 

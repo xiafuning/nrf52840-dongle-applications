@@ -27,6 +27,7 @@
 
 #include "usb_cdc_acm.h"
 #include "fsm.h"
+#include "serial.h"
 
 /**
  * @brief Enable power USB detection
@@ -188,6 +189,14 @@ static void cdc_acm_user_ev_handler(app_usbd_class_inst_t const * p_inst,
             break;
 		case APP_USBD_CDC_ACM_USER_EVT_TX_DONE:
 		{
+            extern bool m_serial_frag_flag;
+            if (m_serial_frag_flag == true)
+            {
+                m_serial_frag_flag = false;
+                tx_buf_t* tx_buffer = get_serial_fragmentation_buf();
+                // send second fragment
+                app_usbd_cdc_acm_write (&m_app_cdc_acm, tx_buffer->buf_1, tx_buffer->buf_1_size);
+            }
 			fsm_event_post(E_USB_CDC_ACM_TX_DONE, NULL);
 			bsp_board_led_invert(LED_CDC_ACM_TX);
             break;

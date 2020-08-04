@@ -19,7 +19,7 @@
 /**
  * @brief function for generating random payload
  */
-int generate_random_payload (char* payload, uint32_t length, uint32_t seq_number)
+uint8_t generate_random_payload (char* payload, uint32_t length, uint32_t seq_number)
 {
     // Seed random number generator to produce different results every time
     srand (seq_number);
@@ -32,7 +32,7 @@ int generate_random_payload (char* payload, uint32_t length, uint32_t seq_number
         *(payload + 4 + 8 + i) = alphanum[rand () % (sizeof (alphanum) - 1)];
     }
     *(payload + 4 + 8 + length) = '\n';
-    return 0;
+    return 4 + 8 + length;
 }
 
 /**

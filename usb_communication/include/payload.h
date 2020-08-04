@@ -6,7 +6,7 @@ static const char alphanum[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "abcdefghijklmnopqrstuvwxyz";
 
-int generate_random_payload (char* payload, uint32_t length, uint32_t seq_number);
+uint8_t generate_random_payload (char* payload, uint32_t length, uint32_t seq_number);
 
 void set_seq_number (char* payload, uint32_t seq_number);
 

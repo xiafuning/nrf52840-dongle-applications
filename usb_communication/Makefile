@@ -7,7 +7,7 @@ LIB_DIR		:=
 OUTPUT_DIR	:= build
 
 CC			:= g++
-CFLAGS		:= -g3 -Wall -std=c++11 -lpthread -Werror
+CFLAGS		:= -g3 -Wall -std=c++11 -lpthread -fpermissive
 
 SRC_FILES	+= $(wildcard ./$(SRC_DIR)/*.c)
 SRC_FILES	+= $(TARGETS).c
@@ -25,3 +25,4 @@ $(OBJS) : $(SRC_FILES)
 
 clean:
 	rm -rf $(OUTPUT_DIR)
+	rm -f *.o

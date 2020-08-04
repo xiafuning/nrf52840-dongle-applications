@@ -31,7 +31,8 @@ void usage(void)
 int main(int argc, char *argv[])
 {
     char str[MAX_SIZE];
-    char rx_buf[MAX_SIZE];
+    char rx_buf[MAX_SIZE * 2];
+    char reasssemble_buffer[MAX_SIZE * 2];
     bool client = false;
     bool server = false;
     bool echo = false;
@@ -85,18 +86,20 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    int tx_counter = 0;
+    uint8_t tx_length = 0;
     int rx_num;
     int tx_ret;
+    tx_buf_t* tx_buffer;
     while (true)
     {
         if (client || echo)
         {
-            sprintf (str, "packet%d_reserve", tx_counter);
-            //printf ("send: %s\n", str);
+            tx_length = sprintf (str, "%c123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", tx_length);
+            memcpy (str, &tx_length, 1);
+            printf ("send: %s, length: %u\n", str, tx_length);
             //printf ("enter a value :");
             //scanf("%[^\n]%*c", str);
-            tx_ret = write_serial_port (fd, str, strlen(str));
+            tx_ret = write_serial_port (fd, str, tx_length);
             if (tx_ret < 0)
                 return -1;
         }
@@ -106,7 +109,10 @@ int main(int argc, char *argv[])
             rx_num = read (fd, rx_buf, MAX_SIZE);
             if (rx_num > 0)
             {
-                printf ("receive %d bytes: %s\n", rx_num, rx_buf);
+                if ((uint8_t)(*rx_buf) == rx_num)
+                    printf ("receive %d bytes: %s\n", rx_num, rx_buf);
+                else
+                    printf ("serial error: %u, drop\n", *rx_buf);
                 // clear rx buffer after processing
                 memset (rx_buf, 0, sizeof rx_buf);
             }

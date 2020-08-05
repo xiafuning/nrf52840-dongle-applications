@@ -14,6 +14,8 @@ Currently implemented applications are listed below.
 ```
 usb_communication
 packet_loss_measurement
+lowpan_simulation
+lowpan_test
 ```
 ## wireless_usb_cdc_acm
 This application implements 802.15.4 for wireless communication and USB CDC ACM for serial communication between board and PC.

@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     }
 
     // lowpan test
-    uint32_t num_packets = 10;
+    uint32_t num_packets = 30;
     uint32_t inter_frame_interval = 100000; // inter frame interval in us
     int ret;
 
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     {
         for (uint8_t i = 0; i < num_packets; ++i)
         {
-            memset (payload, 'a' + i, sizeof payload); 
+            memset (payload, '0' + i, sizeof payload);
             // fragmentation
             if (need_fragmentation (payload_length) == true)
             {
@@ -138,18 +138,42 @@ int main(int argc, char *argv[])
 
     if (server)
     {
-        int rx_num;
+        int rx_num = 0;
         uint8_t rx_count = 0;
         uint8_t extract_buf[MAX_PACKET_SIZE];
         memset (extract_buf, 0, sizeof extract_buf);
+        bool first_frame = true;
+        bool first_frame_tail_exist = false;
+        uint8_t next_frame_size = 0;
+
         // reassemble
         init_reassembler ();
         while (rx_count < num_packets)
         {
-            rx_num = read (fd, rx_buf, MAX_SIZE);
+            if (first_frame == true)
+            {
+                rx_num = read (fd, rx_buf, MAX_SIZE);
+                if (rx_num > 0)
+                    printf ("receive %d bytes\n", rx_num);
+            }
+            else
+            {
+                rx_num = 0;
+                do
+                    rx_num += read (fd, rx_buf + rx_num, 1);
+                while (rx_num < next_frame_size);
+                // handle the case that first frame
+                // is incomplete in the first rx
+                printf ("receive %d bytes\n", rx_num);
+                if (first_frame_tail_exist == true)
+                {
+                    next_frame_size = copy_frame_tail (rx_buf, rx_num);
+                    first_frame_tail_exist = false;
+                    continue;
+                }
+            }
             if (rx_num > 0)
             {
-                printf ("receive %d bytes\n", rx_num);
                 if (relay)
                 {
                     ret = write_serial_port (fd, rx_buf, rx_num);
@@ -160,13 +184,23 @@ int main(int argc, char *argv[])
                 else
                 {
                     if (need_reassemble (rx_buf))
-                        read_frame(rx_buf, rx_num);
+                    {
+                        if (first_frame == true)
+                        {
+                            first_frame = false;
+                            if (rx_num == 64)
+                                first_frame_tail_exist = true;
+                        }
+                        next_frame_size = read_frame (rx_buf, rx_num);
+                    }
                     if (is_reassemble_complete ())
                     {
                         printf ("packet %u reassemble complete!\n", rx_count);
                         extract_packet (extract_buf);
                         print_payload (extract_buf, sizeof extract_buf);
                         rx_count++;
+                        next_frame_size = 0;
+                        first_frame = true;
                         if (rx_count == num_packets)
                             return 0;
                     }
@@ -179,7 +213,7 @@ int main(int argc, char *argv[])
                 fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
                 break;
             }
-        }
-    }
+        } // end while
+    } // end if (server)
     return 0;
 }

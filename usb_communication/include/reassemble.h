@@ -7,6 +7,9 @@ typedef struct
     uint16_t datagram_tag;
     uint16_t datagram_size;
     uint16_t filled_size;
+    uint8_t fragment_num;
+    uint8_t rx_num_order[MAX_FRAG_NUM];
+    uint8_t current_frame;
 } reassembler_t;
 
 
@@ -23,12 +26,27 @@ void init_reassembler (void);
 /**
  * @brief read and process a frame
  */
-void read_frame (uint8_t* frame, uint16_t length);
+uint8_t read_frame (uint8_t* frame, uint16_t length);
 
 /**
  * @brief start a new reassemble process
  */
 void start_new_reassemble (uint8_t* frame);
+
+/**
+ * @brief calculate rx number order
+ */
+void calculate_rx_num_order (void);
+
+/**
+ * @brief calculate fragment number based on datagram size
+ */
+void calculate_fragment_num (void);
+
+/**
+ * @brief copy frame tail to reassemble buffer
+ */
+uint8_t copy_frame_tail (uint8_t* frame_tail, uint8_t length);
 
 /**
  * @brief copy payload to reassemble buffer

@@ -37,13 +37,23 @@ void init_reassembler (void)
 /**
  * @brief read and process a frame
  */
-void read_frame (uint8_t* frame, uint16_t length)
+uint8_t read_frame (uint8_t* frame, uint16_t length)
 {
     if (is_new_packet (frame) == true)
         // discard current reassemble process
         start_new_reassemble (frame);
     copy_payload (frame, length);
     printf ("filled size: %u\n", m_reassembler.filled_size);
+    if (m_reassembler.rx_num_order[m_reassembler.current_frame] == length &&
+        m_reassembler.current_frame != m_reassembler.fragment_num)
+    {
+        m_reassembler.current_frame++;
+        // return size of the next frame
+        return m_reassembler.rx_num_order[m_reassembler.current_frame];
+    }
+    else
+        // return frame tail size
+        return m_reassembler.rx_num_order[m_reassembler.current_frame] - length;
 }
 
 /**
@@ -55,6 +65,50 @@ void start_new_reassemble (uint8_t* frame)
     init_reassembler ();
     m_reassembler.datagram_tag = get_datagram_tag (frame + 2);
     m_reassembler.datagram_size = get_datagram_size (frame);
+    calculate_fragment_num ();
+    calculate_rx_num_order ();
+    m_reassembler.current_frame = 0;
+}
+
+/**
+ * @brief calculate rx number order
+ */
+void calculate_rx_num_order (void)
+{
+    m_reassembler.rx_num_order[0] = FIRST_FRAG_DATA_SIZE +
+                                    FIRST_FRAG_HDR_SIZE +
+                                    IPHC_TOTAL_SIZE +
+                                    UDPHC_TOTAL_SIZE;
+    for (uint8_t i = 0; i < m_reassembler.fragment_num - 2; i++)
+    {
+        m_reassembler.rx_num_order[i+1] = OTHER_FRAG_DATA_SIZE +
+                                          OTHER_FRAG_HDR_SIZE;
+    }
+    m_reassembler.rx_num_order[m_reassembler.fragment_num - 1] =
+            (m_reassembler.datagram_size - (FIRST_FRAG_DATA_SIZE)) %
+            (OTHER_FRAG_DATA_SIZE) + OTHER_FRAG_HDR_SIZE;
+}
+
+/**
+ * @brief calculate fragment number based on datagram size
+ */
+void calculate_fragment_num (void)
+{
+    m_reassembler.fragment_num = (m_reassembler.datagram_size - (FIRST_FRAG_DATA_SIZE)) /
+                                 (OTHER_FRAG_DATA_SIZE) + 2;
+}
+
+/**
+ * @brief copy frame tail to reassemble buffer
+ */
+uint8_t copy_frame_tail (uint8_t* frame_tail, uint8_t length)
+{
+    memcpy (&m_reassembler.reassemble_buffer[m_reassembler.filled_size],
+            frame_tail,
+            length);
+    m_reassembler.filled_size += length;
+    m_reassembler.current_frame++;
+    return m_reassembler.rx_num_order[m_reassembler.current_frame];
 }
 
 /**

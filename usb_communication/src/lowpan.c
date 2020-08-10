@@ -36,6 +36,8 @@ void generate_normal_packet (virtual_packet_t* tx_packet, uint8_t* payload, uint
     // set headers
     set_ip_header (m_packet_buffer);
     set_udp_header (m_packet_buffer+IPHC_TOTAL_SIZE);
+    // set payload length in first byte of IP header
+    *m_packet_buffer = (uint8_t)length + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE;
     // copy payload
     memcpy (&m_packet_buffer[IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE], payload, length);
     // virtual send

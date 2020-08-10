@@ -124,10 +124,21 @@ int main(int argc, char *argv[])
             {
                 printf ("lowpan fragmentation needed\n");
                 do_fragmentation (tx_packet, payload, payload_length);
+                for (uint8_t j = 0; j < get_fragment_num(); j++)
+                {
+                    printf ("frame length: %u\n", tx_packet[j].length);
+                    print_payload (tx_packet[j].packet, tx_packet[j].length);
+                    ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
+                    if (ret < 0)
+                        return -1;
+                    printf ("send a frame\n");
+                    usleep (inter_frame_interval);
+                }
             }
-            for (uint8_t j = 0; j < get_fragment_num(); j++)
+            else
             {
-                ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
+                generate_normal_packet (&tx_packet[0], payload, payload_length);
+                ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
                 if (ret < 0)
                     return -1;
                 printf ("send a frame\n");
@@ -144,17 +155,28 @@ int main(int argc, char *argv[])
         memset (extract_buf, 0, sizeof extract_buf);
         bool first_frame = true;
         bool first_frame_tail_exist = false;
+        bool non_frag_frame_tail_exist = false;
         uint8_t next_frame_size = 0;
 
         // reassemble
         init_reassembler ();
         while (rx_count < num_packets)
         {
+            // read from serial port
             if (first_frame == true)
             {
                 rx_num = read (fd, rx_buf, MAX_SIZE);
                 if (rx_num > 0)
                     printf ("receive %d bytes\n", rx_num);
+            }
+            else if (non_frag_frame_tail_exist == true)
+            {
+                do
+                    rx_num += read (fd, rx_buf + rx_num, 1);
+                while (rx_num < *rx_buf);
+                printf ("receive %d bytes total\n", rx_num);
+                non_frag_frame_tail_exist = false;
+                first_frame = true;
             }
             else
             {
@@ -172,18 +194,20 @@ int main(int argc, char *argv[])
                     continue;
                 }
             }
+
+            // process received packet
             if (rx_num > 0)
             {
                 if (relay)
                 {
                     ret = write_serial_port (fd, rx_buf, rx_num);
-                    printf ("forward a frame\n");
+                    printf ("forward a packet\n");
                     if (ret < 0)
                         return -1;
                 }
                 else
                 {
-                    if (need_reassemble (rx_buf))
+                    if (need_reassemble (rx_buf)) // fragmented packet
                     {
                         if (first_frame == true)
                         {
@@ -192,17 +216,30 @@ int main(int argc, char *argv[])
                                 first_frame_tail_exist = true;
                         }
                         next_frame_size = read_frame (rx_buf, rx_num);
+                        if (is_reassemble_complete ())
+                        {
+                            printf ("packet %u reassemble complete!\n", rx_count);
+                            extract_packet (extract_buf);
+                            print_payload (extract_buf, sizeof extract_buf);
+                            rx_count++;
+                            next_frame_size = 0;
+                            first_frame = true;
+                            if (rx_count == num_packets)
+                                return 0;
+                        }
                     }
-                    if (is_reassemble_complete ())
+                    else // non-fragmented/normal packet
                     {
-                        printf ("packet %u reassemble complete!\n", rx_count);
-                        extract_packet (extract_buf);
-                        print_payload (extract_buf, sizeof extract_buf);
+                        if (*rx_buf != rx_num)
+                        {
+                            first_frame = false;
+                            non_frag_frame_tail_exist = true;
+                            next_frame_size = *rx_buf - rx_num;
+                            continue;
+                        }
+                        printf ("receive a packet\n");
+                        print_payload (rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE, rx_num);
                         rx_count++;
-                        next_frame_size = 0;
-                        first_frame = true;
-                        if (rx_count == num_packets)
-                            return 0;
                     }
                 }
                 // clear rx buffer after processing

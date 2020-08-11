@@ -81,8 +81,6 @@ static sys_event_desc_t m_memory_freed_desc =
  */
 void mcps_data_ind(mcps_data_ind_t * p_ind)
 {
-    sequence_number_t rx_counter = 0;
-
     bool addresses_match = p_ind->dst_pan_id == CONFIG_PAN_ID &&
                            p_ind->dst_addr_mode == MAC_ADDR_SHORT &&
                            (p_ind->dst_addr.short_address == CONFIG_DEVICE_SHORT_ADDRESS ||
@@ -91,7 +89,6 @@ void mcps_data_ind(mcps_data_ind_t * p_ind)
                            p_ind->src_addr_mode == MAC_ADDR_SHORT &&
                            p_ind->src_addr.short_address != CONFIG_DEVICE_SHORT_ADDRESS;
 
-    rx_counter = p_ind->msdu.p_payload[0];
     if (addresses_match && (p_ind->msdu_length > 5))
     {
         fsm_event_data_t data =

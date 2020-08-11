@@ -511,8 +511,8 @@ static void a_radio_tx_start(void * p_data)
         m_data_req.dst_addr.short_address = CONFIG_OTHER_ADDRESS;
         m_data_req.dst_pan_id = CONFIG_PAN_ID;
         m_data_req.src_addr_mode = MAC_ADDR_SHORT;
-        m_data_req.msdu = (uint8_t *)&m_radio_tx_buffer[MAC_MAX_MHR_SIZE];
-        m_data_req.msdu_length = m_radio_tx_size + MAX_APP_SEQUENCE_NUMBER_SIZE;
+        m_data_req.msdu = (uint8_t *)&m_radio_tx_buffer[PAYLOAD_START_POSITION];
+        m_data_req.msdu_length = m_radio_tx_size;
         m_data_req.msdu_handle++;
         m_data_req.tx_options.ack = false;	// XFN_CHANGE, original value: true
         m_data_req.tx_options.gts = false;
@@ -719,15 +719,15 @@ static void a_usb_cdc_acm_tx_start(void * p_data)
     if (need_serial_fragmentation (p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE) == true)
     {
         m_serial_frag_flag = true;
-        tx_buf_t* tx_buffer = serial_fragmentation (p_fsm_frame->payload_descr.p_payload + MAX_APP_SEQUENCE_NUMBER_SIZE,
-                                                    p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE);
+        tx_buf_t* tx_buffer = serial_fragmentation (p_fsm_frame->payload_descr.p_payload,
+                                                    p_fsm_frame->length);
         // send first fragment
         app_usbd_cdc_acm_write (p_usb_cdc_acm, tx_buffer->buf_0, 64);
     }
     else
 	    app_usbd_cdc_acm_write(p_usb_cdc_acm,
-						       p_fsm_frame->payload_descr.p_payload + MAX_APP_SEQUENCE_NUMBER_SIZE,
-						       p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE);
+						       p_fsm_frame->payload_descr.p_payload,
+						       p_fsm_frame->length);
 
     mac_mem_msdu_free(&p_fsm_frame->payload_descr);
 

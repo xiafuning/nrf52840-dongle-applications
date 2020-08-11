@@ -8,12 +8,8 @@
 #define MAX_MSDU_SIZE           100
 #define IPHC_TOTAL_SIZE         3       // LOWPAN_IPHC(2 bytes) + DST_ADDR(1 byte)
 #define UDPHC_TOTAL_SIZE        7
-#define FIRST_FRAG_DATA_SIZE    (MAX_MSDU_SIZE- \
-                                IPHC_TOTAL_SIZE- \
-                                UDPHC_TOTAL_SIZE- \
-                                FIRST_FRAG_HDR_SIZE) / 8 * 8 - 8
-#define OTHER_FRAG_DATA_SIZE    (MAX_MSDU_SIZE- \
-                                OTHER_FRAG_HDR_SIZE) / 8 * 8
+#define FIRST_FRAG_DATA_SIZE    72
+#define OTHER_FRAG_DATA_SIZE    88
 #define MAX_FRAG_NUM            ((MAX_PACKET_SIZE-(FIRST_FRAG_DATA_SIZE))/ \
                                 (OTHER_FRAG_DATA_SIZE) + 2)
 #define FIRST_FRAG_DATA_OFFSET  (FIRST_FRAG_HDR_SIZE+ \

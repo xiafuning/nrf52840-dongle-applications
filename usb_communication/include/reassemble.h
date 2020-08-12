@@ -36,12 +36,12 @@ void start_new_reassemble (uint8_t* frame);
 /**
  * @brief calculate rx number order
  */
-void calculate_rx_num_order (void);
+void calculate_rx_num_order (uint8_t rx_num_order[]);
 
 /**
  * @brief calculate fragment number based on datagram size
  */
-void calculate_fragment_num (void);
+uint8_t calculate_fragment_num (uint16_t datagram_size);
 
 /**
  * @brief copy frame tail to reassemble buffer

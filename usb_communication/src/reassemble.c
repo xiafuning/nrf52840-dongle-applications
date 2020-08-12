@@ -65,26 +65,26 @@ void start_new_reassemble (uint8_t* frame)
     init_reassembler ();
     m_reassembler.datagram_tag = get_datagram_tag (frame + 2);
     m_reassembler.datagram_size = get_datagram_size (frame);
-    calculate_fragment_num ();
-    calculate_rx_num_order ();
+    m_reassembler.fragment_num = calculate_fragment_num (m_reassembler.datagram_size);
+    calculate_rx_num_order (m_reassembler.rx_num_order);
     m_reassembler.current_frame = 0;
 }
 
 /**
  * @brief calculate rx number order
  */
-void calculate_rx_num_order (void)
+void calculate_rx_num_order (uint8_t rx_num_order[])
 {
-    m_reassembler.rx_num_order[0] = FIRST_FRAG_DATA_SIZE +
-                                    FIRST_FRAG_HDR_SIZE +
-                                    IPHC_TOTAL_SIZE +
-                                    UDPHC_TOTAL_SIZE;
+    rx_num_order[0] = FIRST_FRAG_DATA_SIZE +
+                      FIRST_FRAG_HDR_SIZE +
+                      IPHC_TOTAL_SIZE +
+                      UDPHC_TOTAL_SIZE;
     for (uint8_t i = 0; i < m_reassembler.fragment_num - 2; i++)
     {
-        m_reassembler.rx_num_order[i+1] = OTHER_FRAG_DATA_SIZE +
-                                          OTHER_FRAG_HDR_SIZE;
+        rx_num_order[i+1] = OTHER_FRAG_DATA_SIZE +
+                            OTHER_FRAG_HDR_SIZE;
     }
-    m_reassembler.rx_num_order[m_reassembler.fragment_num - 1] =
+    rx_num_order[m_reassembler.fragment_num - 1] =
             (m_reassembler.datagram_size - (FIRST_FRAG_DATA_SIZE)) %
             (OTHER_FRAG_DATA_SIZE) + OTHER_FRAG_HDR_SIZE;
 }
@@ -92,10 +92,9 @@ void calculate_rx_num_order (void)
 /**
  * @brief calculate fragment number based on datagram size
  */
-void calculate_fragment_num (void)
+uint8_t calculate_fragment_num (uint16_t datagram_size)
 {
-    m_reassembler.fragment_num = (m_reassembler.datagram_size - (FIRST_FRAG_DATA_SIZE)) /
-                                 (OTHER_FRAG_DATA_SIZE) + 2;
+    return (datagram_size - (FIRST_FRAG_DATA_SIZE)) / (OTHER_FRAG_DATA_SIZE) + 2;
 }
 
 /**

@@ -10,6 +10,7 @@ typedef struct
     uint8_t fragment_num;
     uint8_t rx_num_order[MAX_FRAG_NUM];
     uint8_t current_frame;
+    bool idle;
 } reassembler_t;
 
 
@@ -59,6 +60,11 @@ void copy_payload (uint8_t* frame, uint16_t length);
 bool is_new_packet (uint8_t* frame);
 
 /**
+ * @brief check if a fragment is the first fragment
+ */
+bool is_first_fragment (uint8_t* frame);
+
+/**
  * @brief check if a packet is completely reassembled
  */
 bool is_reassemble_complete (void);
@@ -72,5 +78,15 @@ void extract_packet (uint8_t* extract_buffer);
  * @brief get reassembler
  */
 reassembler_t* get_reassembler (void);
+
+/**
+ * @brief check if reassembler is running
+ */
+bool is_reassembler_running (void);
+
+/**
+ * @brief check if a frame is correctly formatted
+ */
+bool is_frame_format_correct (uint8_t* frame);
 
 #endif /* REASSEMBLE_H */

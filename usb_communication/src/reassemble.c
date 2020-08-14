@@ -32,6 +32,7 @@ bool need_reassemble (uint8_t* frame)
 void init_reassembler (void)
 {
     memset (&m_reassembler, 0, sizeof m_reassembler);
+    m_reassembler.idle = true;
 }
 
 /**
@@ -39,9 +40,6 @@ void init_reassembler (void)
  */
 uint8_t read_frame (uint8_t* frame, uint16_t length)
 {
-    if (is_new_packet (frame) == true)
-        // discard current reassemble process
-        start_new_reassemble (frame);
     copy_payload (frame, length);
     printf ("filled size: %u\n", m_reassembler.filled_size);
     if (m_reassembler.rx_num_order[m_reassembler.current_frame] == length &&
@@ -63,6 +61,7 @@ void start_new_reassemble (uint8_t* frame)
 {
     printf ("start new reassemble process\nnew tag: %u\n", get_datagram_tag (frame + 2));
     init_reassembler ();
+    m_reassembler.idle = false;
     m_reassembler.datagram_tag = get_datagram_tag (frame + 2);
     m_reassembler.datagram_size = get_datagram_size (frame);
     m_reassembler.fragment_num = calculate_fragment_num (m_reassembler.datagram_size);
@@ -106,6 +105,7 @@ uint8_t copy_frame_tail (uint8_t* frame_tail, uint8_t length)
             frame_tail,
             length);
     m_reassembler.filled_size += length;
+    printf ("filled size: %u\n", m_reassembler.filled_size);
     m_reassembler.current_frame++;
     return m_reassembler.rx_num_order[m_reassembler.current_frame];
 }
@@ -143,11 +143,23 @@ bool is_new_packet (uint8_t* frame)
 }
 
 /**
+ * @brief check if a fragment is the first fragment
+ */
+bool is_first_fragment (uint8_t* frame)
+{
+    if ((*frame) >> 5 == 0x06) // 0b1100 0000 >> 5 = 0b0000 0110
+        return true;
+    else
+        return false;
+}
+
+/**
  * @brief check if a packet is completely reassembled
  */
 bool is_reassemble_complete (void)
 {
-    if (m_reassembler.datagram_size == m_reassembler.filled_size)
+    if (m_reassembler.datagram_size == m_reassembler.filled_size &&
+        m_reassembler.idle == false)
         return true;
     else
         return false;
@@ -169,4 +181,33 @@ void extract_packet (uint8_t* extract_buffer)
 reassembler_t* get_reassembler (void)
 {
     return &m_reassembler;
+}
+
+/**
+ * @brief check if reassembler is running
+ */
+bool is_reassembler_running (void)
+{
+    return !m_reassembler.idle;
+}
+
+/**
+ * @brief check if a frame is correctly formatted
+ */
+bool is_frame_format_correct (uint8_t* frame)
+{
+    // check for non-fragmented packet
+    if ((*(frame + 1)) == 'I' && (*(frame + 2)) == 'I' && (*(frame + 3)) == 'U')
+        return true;
+
+    // check for fragmented packet
+    if (is_reassembler_running () == true &&
+        ((*frame) >> 5 != 0x07 ||
+        get_datagram_size (frame) != m_reassembler.datagram_size ||
+        get_datagram_tag (frame + 2) != m_reassembler.datagram_tag))
+        return false;
+    else if (is_reassembler_running () == false && (*frame) >> 5 != 0x06)
+        return false;
+   else
+        return true;
 }

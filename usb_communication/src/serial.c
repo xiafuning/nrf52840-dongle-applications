@@ -13,7 +13,6 @@ static tx_buf_t m_tx_buf;
 int open_serial_port (char* port, int speed, int parity)
 {
     int fd = open (port, O_RDWR | O_NOCTTY | O_SYNC);
-    fcntl(fd, F_SETFL, 0); // set blocking
     if (fd < 0)
     {
         fprintf (stderr, "error %d opening %s: %s\n", errno, port, strerror (errno));
@@ -45,7 +44,7 @@ int set_interface_attributes (int fd, int speed, int parity)
     tty.c_lflag &= ~ISIG;                           // disable interpretation of INTR, QUIT and SUSP
     tty.c_oflag = 0;                                // no remapping, no delays
     tty.c_cc[VMIN]  = 0;                            // read doesn't block
-    tty.c_cc[VTIME] = 10;                           // 0.1 seconds read timeout
+    tty.c_cc[VTIME] = 1;                            // 0.1 seconds read timeout
 
     tty.c_iflag &= ~(IXON | IXOFF | IXANY);         // shut off xon/xoff ctrl
     tty.c_cflag |= (CLOCAL | CREAD);                // ignore modem controls, enable reading

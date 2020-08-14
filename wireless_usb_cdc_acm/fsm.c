@@ -716,7 +716,7 @@ static void a_usb_cdc_acm_tx_start(void * p_data)
 
 	app_usbd_cdc_acm_t const * p_usb_cdc_acm = usb_cdc_acm_inst_get();
 
-    if (need_serial_fragmentation (p_fsm_frame->length - MAX_APP_SEQUENCE_NUMBER_SIZE) == true)
+    if (need_serial_fragmentation (p_fsm_frame->length) == true)
     {
         m_serial_frag_flag = true;
         tx_buf_t* tx_buffer = serial_fragmentation (p_fsm_frame->payload_descr.p_payload,

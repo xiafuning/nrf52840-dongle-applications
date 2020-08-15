@@ -201,6 +201,7 @@ int main(int argc, char *argv[])
             {
                 // if not, reset reassembler
                 printf ("incorrect format\n");
+                print_payload (rx_buf, rx_num);
                 init_reassembler ();
                 first_frame = true;
                 first_frame_tail_exist = false;
@@ -212,19 +213,26 @@ int main(int argc, char *argv[])
             // process received packet
             if (need_reassemble (rx_buf)) // fragmented packet
             {
-                if ((is_reassembler_running () == false &&
+                if (// last packet is reassembled and receive
+                    // first frame of a new packet
+                    (is_reassembler_running () == false &&
                     is_first_fragment (rx_buf) == true) ||
+                    // last packet is in reassembling and receive
+                    // first frame of a new packet (at least one
+                    // fragment of last packet is lost)
                     (is_reassembler_running () == true &&
                     is_new_packet (rx_buf) == true &&
-                    is_first_fragment (rx_buf) == true))
+                    is_first_fragment (rx_buf) == true &&
+                    // make sure part of the payload is included
+                    // avoid segmentation fault
+                    rx_num > FIRST_FRAG_DATA_OFFSET))
                 {
                     start_new_reassemble (rx_buf);
                     if (first_frame == true)
-                    {
                         first_frame = false;
-                        if (rx_num == 64)
-                            first_frame_tail_exist = true;
-                    }
+                    reassembler_t* reassembler = get_reassembler ();
+                    if (rx_num < reassembler->rx_num_order[0])
+                        first_frame_tail_exist = true;
                     next_frame_size = read_frame (rx_buf, rx_num);
                 }
                 else if (is_reassembler_running () == true &&

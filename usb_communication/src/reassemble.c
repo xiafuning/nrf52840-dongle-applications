@@ -78,12 +78,15 @@ void calculate_rx_num_order (uint8_t rx_num_order[],
                              uint8_t fragment_num,
                              uint16_t datagram_size)
 {
+    // first fragment size
     rx_num_order[0] = FIRST_FRAG_DATA_SIZE +
                       FIRST_FRAG_HDR_SIZE +
                       IPHC_TOTAL_SIZE +
                       UDPHC_TOTAL_SIZE;
+    // other fragment size
     for (uint8_t i = 0; i < fragment_num - 2; i++)
         rx_num_order[i+1] = OTHER_FRAG_DATA_SIZE + OTHER_FRAG_HDR_SIZE;
+    // tail size
     rx_num_order[fragment_num - 1] =
             (datagram_size - (FIRST_FRAG_DATA_SIZE)) %
             (OTHER_FRAG_DATA_SIZE) + OTHER_FRAG_HDR_SIZE;
@@ -202,12 +205,20 @@ bool is_frame_format_correct (uint8_t* frame)
         return true;
 
     // check for fragmented packet
+    // one packet is in reassembling and
+    // receive a non-first fragment of another packet
+    // (at least one fragment of current packet is lost
+    // and first fragment of another packet is also lost
+    // makes both packets are not able to be reassembled)
     if (is_reassembler_running () == true &&
         is_new_packet (frame) == true &&
         is_first_fragment (frame) == false)
         return false;
-    else if (is_reassembler_running () == false && (*frame) >> 5 != 0x06)
+    // reassembler is idle and receives a non-first fragment
+    else if (is_reassembler_running () == false &&
+             is_first_fragment (frame) == false)
         return false;
+    // other cases
     else
         return true;
 }

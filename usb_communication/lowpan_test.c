@@ -235,15 +235,17 @@ int main(int argc, char *argv[])
                         first_frame_tail_exist = true;
                     next_frame_size = read_frame (rx_buf, rx_num);
                 }
+                // receive a fragment of a known packet
                 else if (is_reassembler_running () == true &&
                     is_new_packet (rx_buf) == false)
                     next_frame_size = read_frame (rx_buf, rx_num);
+                // other cases
                 else
                 {
                     memset (rx_buf, 0, sizeof rx_buf);
                     continue;
                 }
-                if (is_reassemble_complete ())
+                if (is_reassemble_complete () == true)
                 {
                     printf ("packet %u reassemble complete!\n", rx_count);
                     extract_packet (extract_buf);

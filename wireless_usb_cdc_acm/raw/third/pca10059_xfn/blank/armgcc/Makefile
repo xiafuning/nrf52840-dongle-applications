@@ -98,6 +98,8 @@ SRC_FILES += \
   $(SDK_ROOT)/modules/nrfx/drivers/src/nrfx_usbd.c \
   $(SDK_ROOT)/components/libraries/bsp/bsp.c \
   $(SDK_ROOT)/components/libraries/bsp/bsp_cli.c \
+  $(SDK_ROOT)/components/802_15_4/src/rng_entity.c \
+  $(SDK_ROOT)/components/802_15_4/src/sec_aes_entity.c \
 
 # Include folders common to all targets
 INC_FOLDERS += \
@@ -181,7 +183,7 @@ INC_FOLDERS += \
 
 # Libraries common to all targets
 LIB_FILES += \
-  $(SDK_ROOT)/components/802_15_4/raw/802_15_4_lib_gcc.a \
+  $(SDK_ROOT)/components/802_15_4/secure/802_15_4_lib_gcc.a \
 
 # Optimization flags
 OPT = -O3 -g3

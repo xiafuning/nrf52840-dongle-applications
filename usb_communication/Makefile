@@ -3,18 +3,22 @@
 
 SRC_DIR		:= src
 INC_DIR		:= include
-LIB_DIR		:=
+LIB_DIR		:= lib
 OUTPUT_DIR	:= build
 
 CC			:= g++
-CFLAGS		:= -g3 -Wall -std=c++11 -lpthread -fpermissive
+OPT			:= -g3 -O3
+CFLAGS		+= $(OPT)
+CFLAGS		+= -Wall -std=c++14 -lpthread -fpermissive
+CFLAGS		+= -ftree-vectorize
 
 SRC_FILES	+= $(wildcard ./$(SRC_DIR)/*.c)
 SRC_FILES	+= $(TARGETS).c
+LIB_FILES	+= -lkodo_rlnc
 OBJS		:= $(patsubst %.c, %.o, $(notdir $(SRC_FILES)))
 
 $(TARGETS) : $(OBJS)
-	$(CC) $^ -o $(OUTPUT_DIR)/$@ $(CFLAGS) -I $(INC_DIR)
+	$(CC) $^ -o $(OUTPUT_DIR)/$@ $(CFLAGS) -I $(INC_DIR) -L $(LIB_DIR) $(LIB_FILES)
 	@mv *.o $(OUTPUT_DIR)
 	@echo "Linking complete!"
 

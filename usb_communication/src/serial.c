@@ -44,7 +44,7 @@ int set_interface_attributes (int fd, int speed, int parity)
     tty.c_lflag &= ~ISIG;                           // disable interpretation of INTR, QUIT and SUSP
     tty.c_oflag = 0;                                // no remapping, no delays
     tty.c_cc[VMIN]  = 0;                            // read doesn't block
-    tty.c_cc[VTIME] = 1;                            // 0.1 seconds read timeout
+    tty.c_cc[VTIME] = 0;                            // 0.1 seconds read timeout
 
     tty.c_iflag &= ~(IXON | IXOFF | IXANY);         // shut off xon/xoff ctrl
     tty.c_cflag |= (CLOCAL | CREAD);                // ignore modem controls, enable reading
@@ -76,7 +76,6 @@ void set_blocking (int fd, int should_block)
     }
 
     tty.c_cc[VMIN]  = should_block ? 1 : 0;
-    tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
 
     if (tcsetattr (fd, TCSANOW, &tty) != 0)
         fprintf (stderr, "error %d setting term attributes\n", errno);

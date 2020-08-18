@@ -6,6 +6,9 @@
 #include <unistd.h>
 
 #include "serial.h"
+#include "lowpan.h"
+#include "reassemble.h"
+#include "payload.h"
 
 // variable definitions
 static tx_buf_t m_tx_buf;
@@ -134,4 +137,138 @@ tx_buf_t* serial_fragmentation (char* data, int length)
     m_tx_buf.buf_0_size = 64;
     m_tx_buf.buf_1_size = length - 62;
     return &m_tx_buf;
+}
+
+uint16_t read_serial_port (int fd, uint8_t* extract_buf)
+{
+    // parameter definitions
+    int rx_num = 0;
+    uint8_t rx_buf[128];
+    memset (rx_buf, 0, sizeof rx_buf);
+    bool first_frame = true;
+    bool first_frame_tail_exist = false;
+    bool non_frag_frame_tail_exist = false;
+    bool read_complete = false;
+    uint8_t next_frame_size = 0;
+
+    init_reassembler ();
+
+    while (read_complete == false)
+    {
+        // read from serial port
+        if (first_frame == true)
+        {
+            rx_num = read (fd, rx_buf, 128);
+            if (rx_num > 0)
+                printf ("receive %d bytes\n", rx_num);
+            else if (rx_num == -1)
+            {
+                fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
+                break;
+            }
+            else // no data received
+                continue;
+        }
+        else if (non_frag_frame_tail_exist == true)
+        {
+            do
+                rx_num += read (fd, rx_buf + rx_num, 1);
+            while (rx_num < *rx_buf);
+            printf ("receive %d bytes total\n", rx_num);
+            non_frag_frame_tail_exist = false;
+            first_frame = true;
+        }
+        else
+        {
+            rx_num = 0;
+            do
+                rx_num += read (fd, rx_buf + rx_num, 1);
+            while (rx_num < next_frame_size);
+            // handle the case that first frame
+            // is incomplete in the first rx
+            printf ("receive %d bytes\n", rx_num);
+            if (first_frame_tail_exist == true)
+            {
+                next_frame_size = copy_frame_tail (rx_buf, rx_num);
+                first_frame_tail_exist = false;
+                continue;
+            }
+        }
+
+        // check if frame is correctly formatted
+        if (is_frame_format_correct (rx_buf) == false)
+        {
+            // if not, reset reassembler
+            printf ("incorrect format\n");
+            print_payload (rx_buf, rx_num);
+            init_reassembler ();
+            first_frame = true;
+            first_frame_tail_exist = false;
+            non_frag_frame_tail_exist = false;
+            next_frame_size = 0;
+            continue;
+        }
+
+        // process received packet
+        if (need_reassemble (rx_buf)) // fragmented packet
+        {
+            if (// last packet is reassembled and receive
+                // first frame of a new packet
+                (is_reassembler_running () == false &&
+                is_first_fragment (rx_buf) == true) ||
+                // last packet is in reassembling and receive
+                // first frame of a new packet (at least one
+                // fragment of last packet is lost)
+                (is_reassembler_running () == true &&
+                is_new_packet (rx_buf) == true &&
+                is_first_fragment (rx_buf) == true &&
+                // make sure part of the payload is included
+                // avoid segmentation fault
+                rx_num > FIRST_FRAG_DATA_OFFSET))
+            {
+                start_new_reassemble (rx_buf);
+                if (first_frame == true)
+                    first_frame = false;
+                reassembler_t* reassembler = get_reassembler ();
+                if (rx_num < reassembler->rx_num_order[0])
+                    first_frame_tail_exist = true;
+                next_frame_size = read_frame (rx_buf, rx_num);
+            }
+            // receive a fragment of a known packet
+            else if (is_reassembler_running () == true &&
+                     is_new_packet (rx_buf) == false)
+                next_frame_size = read_frame (rx_buf, rx_num);
+            // other cases
+            else
+            {
+                memset (rx_buf, 0, sizeof rx_buf);
+                continue;
+            }
+            if (is_reassemble_complete () == true)
+            {
+                printf ("packet reassemble complete!\n");
+                // extract reassembled packet
+                extract_packet (extract_buf);
+                // set read complete flag
+                read_complete = true;
+                reassembler_t* reassembler = get_reassembler ();
+                return reassembler->filled_size;
+            }
+        }
+        else // non-fragmented/normal packet
+        {
+            if (*rx_buf != rx_num)
+            {
+                first_frame = false;
+                non_frag_frame_tail_exist = true;
+                next_frame_size = *rx_buf - rx_num;
+                continue;
+            }
+            printf ("receive a packet\n");
+            memcpy (extract_buf,
+                    rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                    rx_num - IPHC_TOTAL_SIZE - UDPHC_TOTAL_SIZE);
+            return (uint16_t)(rx_num - IPHC_TOTAL_SIZE - UDPHC_TOTAL_SIZE);
+        }
+    } // end of while
 }

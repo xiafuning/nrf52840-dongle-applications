@@ -84,7 +84,7 @@ void set_blocking (int fd, int should_block)
         fprintf (stderr, "error %d setting term attributes\n", errno);
 }
 
-int write_serial_port (int fd, char* data, int length)
+int write_serial_port (int fd, uint8_t* data, int length)
 {
     int ret;
     if (need_serial_fragmentation (length) == true)
@@ -126,7 +126,7 @@ bool need_serial_fragmentation (int length)
     return (length > 64);
 }
 
-tx_buf_t* serial_fragmentation (char* data, int length)
+tx_buf_t* serial_fragmentation (uint8_t* data, int length)
 {
     memset (&m_tx_buf, 0, sizeof m_tx_buf);
     // set serial fragment indicator
@@ -271,4 +271,5 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
             return (uint16_t)(rx_num - IPHC_TOTAL_SIZE - UDPHC_TOTAL_SIZE);
         }
     } // end of while
+    return 0;
 }

@@ -48,7 +48,7 @@ void do_fragmentation (virtual_packet_t tx_packet[], uint8_t* payload, uint16_t 
 /**
  * @brief initialize a new fragment header
  */
-int init_fragment_header (uint8_t* fragment_type, uint8_t* packet_buffer, uint16_t length);
+int init_fragment_header (const char* fragment_type, uint8_t* packet_buffer, uint16_t length);
 
 /**
  * @brief set datagram offset in fragment header
@@ -73,7 +73,7 @@ uint16_t get_datagram_size (uint8_t* size_offset);
 /**
  * @brief set datagram tag in fragment header
  */
-void set_datagram_tag (uint8_t* fragment_type, uint8_t* size_offset);
+void set_datagram_tag (const char* fragment_type, uint8_t* size_offset);
 
 /**
  * @brief get datagram tag

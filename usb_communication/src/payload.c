@@ -83,7 +83,7 @@ long get_timestamp (char* payload)
 /**
  * @brief function for printing payload
  */
-void print_payload (char* payload, uint32_t length)
+void print_payload (uint8_t* payload, uint32_t length)
 {
     printf ("payload: ");
     for (uint32_t i = 0; i < length; ++i)

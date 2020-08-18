@@ -215,7 +215,8 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
             if (// last packet is reassembled and receive
                 // first frame of a new packet
                 (is_reassembler_running () == false &&
-                is_first_fragment (rx_buf) == true) ||
+                is_first_fragment (rx_buf) == true &&
+                rx_num > FIRST_FRAG_DATA_OFFSET) ||
                 // last packet is in reassembling and receive
                 // first frame of a new packet (at least one
                 // fragment of last packet is lost)

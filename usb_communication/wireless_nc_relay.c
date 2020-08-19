@@ -13,6 +13,7 @@
 #include "payload.h"
 #include "lowpan.h"
 #include "reassemble.h"
+#include "utils.h"
 
 #include <kodo_rlnc/coders.hpp>
 
@@ -166,6 +167,7 @@ int main(int argc, char *argv[])
             // construct payload
             memcpy (payload, extract_buf, payload_length);
         }
+
         // forward packet
         // fragmentation
         if (need_fragmentation (payload_length) == true)

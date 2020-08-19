@@ -8,7 +8,7 @@
 #include "serial.h"
 #include "lowpan.h"
 #include "reassemble.h"
-#include "payload.h"
+#include "utils.h"
 
 // variable definitions
 static tx_buf_t m_tx_buf;

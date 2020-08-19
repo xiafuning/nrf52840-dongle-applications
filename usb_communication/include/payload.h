@@ -16,6 +16,4 @@ uint32_t get_seq_number (char* payload);
 
 long get_timestamp (char* payload);
 
-void print_payload (uint8_t* payload, uint32_t length);
-
 #endif /* PAYLOAD_H */

@@ -8,7 +8,7 @@
 
 #include "lowpan.h"
 #include "reassemble.h"
-//#include "fsm.h"
+#include "utils.h"
 
 // variable definitions
 static reassembler_t m_reassembler;

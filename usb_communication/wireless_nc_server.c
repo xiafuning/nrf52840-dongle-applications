@@ -13,6 +13,7 @@
 #include "payload.h"
 #include "lowpan.h"
 #include "reassemble.h"
+#include "config.h"
 
 #include <kodo_rlnc/coders.hpp>
 
@@ -93,6 +94,7 @@ int main(int argc, char *argv[])
     }
 
     int ret;
+    int rx_num = 0;
     uint16_t rx_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
     memset (extract_buf, 0, sizeof extract_buf);
@@ -109,19 +111,31 @@ int main(int argc, char *argv[])
     // assign source data buffer to encoder
     decoder.set_symbols_storage (data_out);
 
+    // set ack message buffer
+    virtual_packet_t ack_buf;
+    memset (&ack_buf, 0, sizeof ack_buf);
+    generate_normal_packet (&ack_buf, (uint8_t*)SERVER_ACK, sizeof SERVER_ACK);
+
     print_nc_config (&decoder);
 
     // server operations
     while (decoder.is_complete() == false)
     {
         // receive a packet
-        read_serial_port (fd, extract_buf);
+        rx_num = read_serial_port (fd, extract_buf);
+        if (rx_num == 0)
+            continue;
         decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size(),
                                 extract_buf);
         memset (extract_buf, 0, sizeof extract_buf);
         rx_count++;
     } // end of while
     printf ("decode complete!\n");
+    // send ACK message
+    ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
+    if (ret < 0)
+        return -1;
+
     print_payload (data_out, sizeof data_out);
     printf ("packet total receive: %u\n", rx_count);
     return 0;

@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
     }
 
     int ret;
+    int rx_num = 0;
     uint16_t rx_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
     memset (extract_buf, 0, sizeof extract_buf);
@@ -135,7 +136,9 @@ int main(int argc, char *argv[])
     while (true)
     {
         // receive a packet
-        read_serial_port (fd, extract_buf);
+        rx_num = read_serial_port (fd, extract_buf);
+        if (rx_num == 0)
+            continue;
         if (recode_enable == true)
         {
             printf ("recode a symbol\n");

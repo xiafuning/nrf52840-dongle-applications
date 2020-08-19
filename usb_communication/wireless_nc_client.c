@@ -13,6 +13,7 @@
 #include "payload.h"
 #include "lowpan.h"
 #include "reassemble.h"
+#include "config.h"
 
 #include <kodo_rlnc/coders.hpp>
 
@@ -167,9 +168,9 @@ int main(int argc, char *argv[])
             usleep (inter_frame_interval);
         }
         // check for ack from decoder
-        rx_num = read (fd, rx_buf, MAX_SIZE);
-        if (rx_num > 0 && rx_buf[0] == 'a' &&
-            rx_buf[1] == 'c' && rx_buf[2] == 'k')
+        rx_num = read_serial_port (fd, rx_buf);
+        if (rx_num > 0 &&
+            strcmp ((const char*)rx_buf, SERVER_ACK) == 0)
         {
             printf ("receive ACK from decoder\n");
             decode_complete_ack = true;

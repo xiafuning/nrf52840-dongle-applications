@@ -167,7 +167,7 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
                 break;
             }
             else // no data received
-                continue;
+                return 0;
         }
         else if (non_frag_frame_tail_exist == true)
         {

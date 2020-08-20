@@ -246,6 +246,18 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
                 memset (rx_buf, 0, sizeof rx_buf);
                 continue;
             }
+            // check if next frame size is valid
+            if (next_frame_size > sizeof rx_buf)
+            {
+                // if not, reset reassembler
+                printf ("incorrect next frame size\n");
+                init_reassembler ();
+                first_frame = true;
+                first_frame_tail_exist = false;
+                non_frag_frame_tail_exist = false;
+                next_frame_size = 0;
+                continue;
+            }
             if (is_reassemble_complete () == true)
             {
                 printf ("packet reassemble complete!\n");

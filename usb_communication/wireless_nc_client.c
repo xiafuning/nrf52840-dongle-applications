@@ -10,7 +10,7 @@
 #include <stdlib.h>
 
 #include "serial.h"
-#include "payload.h"
+#include "utils.h"
 #include "lowpan.h"
 #include "reassemble.h"
 #include "config.h"

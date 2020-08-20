@@ -10,7 +10,6 @@
 #include <stdlib.h>
 
 #include "serial.h"
-#include "payload.h"
 #include "lowpan.h"
 #include "reassemble.h"
 #include "utils.h"
@@ -25,7 +24,7 @@ static struct option long_options[] =
     {"port",        required_argument, 0, 'p'},
     {"symbolSize",  required_argument, 0, 's'},
     {"genSize",     required_argument, 0, 'g'},
-    {"recode",       no_argument,       0, 'r'},
+    {"recode",      no_argument,       0, 'r'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
@@ -41,15 +40,16 @@ void usage(void)
     printf ("\t-h --help\tthis help documetation\n");
 }
 
-void print_nc_config (kodo_rlnc::pure_recoder* recoder)
+void print_nc_config (kodo_rlnc::pure_recoder* recoder,
+                      bool recode_enable)
 {
     // print configuration
     printf ("---------NC configuration---------\n");
     printf ("recoder symbol size:\t\t%u\n", recoder->symbol_size());
     printf ("recoder coeff vector size:\t%u\n", recoder->coefficient_vector_size());
     printf ("recoder payload size:\t\t%u\n", recoder->max_payload_size());
+    printf ("recoding enable:\t\t%s\n", recode_enable ? "true" : "false");
     printf ("---------NC configuration---------\n");
-
 }
 
 int main(int argc, char *argv[])
@@ -131,9 +131,9 @@ int main(int argc, char *argv[])
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
 
-    print_nc_config (&recoder);
+    print_nc_config (&recoder, recode_enable);
 
-    // server operations
+    // relay operations
     while (true)
     {
         // receive a packet

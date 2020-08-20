@@ -125,6 +125,7 @@ int main(int argc, char *argv[])
         rx_num = read_serial_port (fd, extract_buf);
         if (rx_num == 0)
             continue;
+        // read symbol and coding coefficients into the decoder
         decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size(),
                                 extract_buf);
         memset (extract_buf, 0, sizeof extract_buf);

@@ -42,6 +42,7 @@ int set_interface_attributes (int fd, int speed, int parity)
 
     tty.c_cflag = (tty.c_cflag & ~CSIZE) | CS8;     // 8-bit chars
     tty.c_iflag &= ~IGNBRK;                         // disable break processing
+    tty.c_iflag &= ~(INLCR | ICRNL);                // avoid 0x0d to 0x0a problem
     tty.c_lflag &= ~ICANON;                         // disable canonical mode
     tty.c_lflag &= ~ECHO;                           // disable echo
     tty.c_lflag &= ~ISIG;                           // disable interpretation of INTR, QUIT and SUSP

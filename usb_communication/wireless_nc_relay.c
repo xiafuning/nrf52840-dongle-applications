@@ -13,6 +13,7 @@
 #include "lowpan.h"
 #include "reassemble.h"
 #include "utils.h"
+#include "config.h"
 
 #include <kodo_rlnc/coders.hpp>
 
@@ -140,6 +141,18 @@ int main(int argc, char *argv[])
         rx_num = read_serial_port (fd, extract_buf);
         if (rx_num == 0)
             continue;
+        // check for ack from encoder
+        else if (rx_num > 0 &&
+                 strcmp ((const char*)extract_buf, CLIENT_ACK) == 0)
+        {
+            printf ("receive ACK from encoder\n");
+            break;
+        }
+        else if (rx_num == -1)
+        {
+            fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
+            break;
+        }
         if (recode_enable == true)
         {
             printf ("recode a symbol\n");
@@ -166,6 +179,7 @@ int main(int argc, char *argv[])
         {
             // construct payload
             memcpy (payload, extract_buf, payload_length);
+            rx_count++;
         }
 
         // forward packet
@@ -191,5 +205,6 @@ int main(int argc, char *argv[])
             printf ("forward a packet\n");
         }
     } // end of while
+    printf ("packet total forward: %u\n", rx_count);
     return 0;
 }

@@ -174,6 +174,13 @@ int main(int argc, char *argv[])
         {
             printf ("receive ACK from decoder\n");
             decode_complete_ack = true;
+            // send ack to relay node
+            generate_normal_packet (&tx_packet[0],
+                                    (uint8_t*)CLIENT_ACK,
+                                    sizeof CLIENT_ACK);
+            ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
+            if (ret < 0)
+                return -1;
         }
         else if (rx_num == -1)
         {

@@ -113,8 +113,12 @@ int main(int argc, char *argv[])
 
     // set ack message buffer
     virtual_packet_t ack_buf;
+    uint8_t ack_packet[MAX_SIZE];
+    memset (ack_packet, 0, sizeof ack_packet);
     memset (&ack_buf, 0, sizeof ack_buf);
-    generate_normal_packet (&ack_buf, (uint8_t*)SERVER_ACK, sizeof SERVER_ACK);
+    // construct ack packet
+    uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)SERVER_ACK);
+    generate_normal_packet (&ack_buf, ack_packet, ack_packet_length);
 
     print_nc_config (&decoder);
 
@@ -125,9 +129,11 @@ int main(int argc, char *argv[])
         rx_num = read_serial_port (fd, extract_buf);
         if (rx_num == 0)
             continue;
+        print_payload (extract_buf, rx_num);
         // read symbol and coding coefficients into the decoder
-        decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size(),
-                                extract_buf);
+        decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size() +
+                                IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                                extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
         memset (extract_buf, 0, sizeof extract_buf);
         rx_count++;
     } // end of while

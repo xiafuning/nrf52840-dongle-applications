@@ -279,10 +279,8 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
                 continue;
             }
             printf ("receive a packet\n");
-            memcpy (extract_buf,
-                    rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-                    rx_num - IPHC_TOTAL_SIZE - UDPHC_TOTAL_SIZE);
-            return (uint16_t)(rx_num - IPHC_TOTAL_SIZE - UDPHC_TOTAL_SIZE);
+            memcpy (extract_buf, rx_buf, rx_num);
+            return (uint16_t)rx_num;
         }
     } // end of while
     return 0;

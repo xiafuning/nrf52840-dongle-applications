@@ -7,7 +7,7 @@
 #include <time.h>
 
 #include "lowpan.h"
-//#include "fsm.h"
+#include "config.h"
 
 // variable definitions
 static uint8_t m_fragment_num = 0;
@@ -23,7 +23,7 @@ static uint16_t m_current_datagram_offset = 0;
  */
 bool need_fragmentation (uint16_t length)
 {
-    return (length + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE > MAX_MSDU_SIZE);
+    return length > MAX_MSDU_SIZE;
 }
 
 /**
@@ -31,17 +31,13 @@ bool need_fragmentation (uint16_t length)
  */
 void generate_normal_packet (virtual_packet_t* tx_packet, uint8_t* payload, uint16_t length)
 {
-    uint16_t packet_length = length + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE;
     memset (m_packet_buffer, 0, sizeof m_packet_buffer);
-    // set headers
-    set_ip_header (m_packet_buffer);
-    set_udp_header (m_packet_buffer+IPHC_TOTAL_SIZE);
-    // set payload length in first byte of IP header
-    *m_packet_buffer = (uint8_t)length + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE;
     // copy payload
-    memcpy (&m_packet_buffer[IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE], payload, length);
+    memcpy (m_packet_buffer, payload, length);
+    // set payload length in first byte of IP header
+    *m_packet_buffer = (uint8_t)length;
     // virtual send
-    virtual_send (tx_packet, m_packet_buffer, packet_length);
+    virtual_send (tx_packet, m_packet_buffer, length);
 }
 
 /**
@@ -59,19 +55,15 @@ void do_fragmentation (virtual_packet_t tx_packet[], uint8_t* payload, uint16_t 
         {
             // set fragment header
             init_fragment_header ("first", m_packet_buffer, length);
-            // set headers
-            set_ip_header (m_packet_buffer + FIRST_FRAG_HDR_SIZE);
-            set_udp_header (m_packet_buffer + FIRST_FRAG_HDR_SIZE + IPHC_TOTAL_SIZE);
             // copy payload
             memcpy (&m_packet_buffer[FIRST_FRAG_DATA_OFFSET],
                     payload,
-                    m_first_frag_size);
+                    m_first_frag_size + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
             m_current_datagram_offset = m_first_frag_size;
             // virtual send
             virtual_send (&tx_packet[i],
                           m_packet_buffer,
-                          FIRST_FRAG_HDR_SIZE + IPHC_TOTAL_SIZE + 
-                          UDPHC_TOTAL_SIZE + m_first_frag_size);
+                          FIRST_FRAG_HDR_SIZE + m_first_frag_size);
             first_fragment = false;
         }
         else if (i == m_fragment_num - 1) // last fragment
@@ -215,6 +207,31 @@ void set_ip_header (uint8_t* iphc_offset)
 void set_udp_header (uint8_t* udphc_offset)
 {
     memset (udphc_offset, 'U', UDPHC_TOTAL_SIZE);
+    set_udp_checksum (udphc_offset);
+}
+
+/**
+ * @brief get UDP header
+ */
+uint8_t* get_udp_header (uint8_t* packet)
+{
+    return packet + IPHC_TOTAL_SIZE;
+}
+
+/**
+ * @brief set UDP checksum
+ */
+void set_udp_checksum (uint8_t* udphc_offset)
+{
+   *(uint16_t*)(udphc_offset + 5) = (uint16_t)rand();
+}
+
+/**
+ * @brief get UDP checksum
+ */
+uint16_t get_udp_checksum (uint8_t* checksum_offset)
+{
+   return *(uint16_t*)checksum_offset;
 }
 
 /**
@@ -231,4 +248,36 @@ uint8_t get_fragment_num (void)
 uint8_t get_tail_size (void)
 {
     return m_tail_size;
+}
+
+/**
+ * @brief generate an ack packet
+ */
+uint8_t generate_ack_packet (uint8_t* packet, uint8_t* ack)
+{
+    uint16_t length = 0;
+    set_ip_header (packet);
+    set_udp_header (packet + IPHC_TOTAL_SIZE);
+    if (*ack == 'c')
+    {
+        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+        (uint8_t*)CLIENT_ACK,
+        sizeof CLIENT_ACK);
+        length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof CLIENT_ACK;
+    }
+    else if (*ack == 'r')
+    {
+        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+        (uint8_t*)RELAY_ACK,
+        sizeof RELAY_ACK);
+        length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof RELAY_ACK;
+    }
+    else if (*ack == 's')
+    {
+        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+        (uint8_t*)SERVER_ACK,
+        sizeof SERVER_ACK);
+        length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof SERVER_ACK;
+    }
+    return length;
 }

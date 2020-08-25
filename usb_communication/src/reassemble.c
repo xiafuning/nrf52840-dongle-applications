@@ -80,9 +80,7 @@ void calculate_rx_num_order (uint8_t rx_num_order[],
 {
     // first fragment size
     rx_num_order[0] = FIRST_FRAG_DATA_SIZE +
-                      FIRST_FRAG_HDR_SIZE +
-                      IPHC_TOTAL_SIZE +
-                      UDPHC_TOTAL_SIZE;
+                      FIRST_FRAG_HDR_SIZE;
     // other fragment size
     for (uint8_t i = 0; i < fragment_num - 2; i++)
         rx_num_order[i+1] = OTHER_FRAG_DATA_SIZE + OTHER_FRAG_HDR_SIZE;

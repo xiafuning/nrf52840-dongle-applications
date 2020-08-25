@@ -116,12 +116,20 @@ int main(int argc, char *argv[])
     // fill source data buffer with specific values
     memset (data_in, 'T', sizeof (data_in));
 
+    // set ack packet buffer
+    uint8_t ack_packet[MAX_SIZE];
+    memset (ack_packet, 0, sizeof ack_packet);
+
     // assign source data buffer to encoder
     encoder.set_symbols_storage (data_in);
 
-    uint32_t payload_length = encoder.symbol_size() + encoder.coefficient_vector_size();
-    uint8_t payload[payload_length];
-    memset (payload, 0, sizeof payload);
+    // set data packet buffer
+    uint32_t packet_length = encoder.symbol_size() +
+             encoder.coefficient_vector_size() +
+             IPHC_TOTAL_SIZE +
+             UDPHC_TOTAL_SIZE;
+    uint8_t packet[packet_length];
+    memset (packet, 0, sizeof packet);
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
 
@@ -135,18 +143,21 @@ int main(int argc, char *argv[])
         // write encoded symbol corresponding to the coding coefficients
         encoder.produce_symbol (encoder_symbol,
                                 encoder_symbol_coefficients);
-        // construct payload
-        memcpy (payload,
+        // construct packet
+        set_ip_header (packet);
+        set_udp_header (packet + IPHC_TOTAL_SIZE);
+        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                 encoder_symbol_coefficients,
                 sizeof encoder_symbol_coefficients);
-        memcpy (payload + sizeof encoder_symbol_coefficients,
+        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE +
+                sizeof encoder_symbol_coefficients,
                 encoder_symbol,
                 sizeof encoder_symbol);
         // fragmentation
-        if (need_fragmentation (payload_length) == true)
+        if (need_fragmentation (packet_length) == true)
         {
             printf ("lowpan fragmentation needed\n");
-            do_fragmentation (tx_packet, payload, payload_length);
+            do_fragmentation (tx_packet, packet, packet_length);
             for (uint8_t j = 0; j < get_fragment_num(); j++)
             {
                 ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
@@ -159,7 +170,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            generate_normal_packet (&tx_packet[0], payload, payload_length);
+            generate_normal_packet (&tx_packet[0], packet, packet_length);
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;
@@ -170,14 +181,13 @@ int main(int argc, char *argv[])
         // check for ack from decoder
         rx_num = read_serial_port (fd, rx_buf);
         if (rx_num > 0 &&
-            strcmp ((const char*)rx_buf, SERVER_ACK) == 0)
+            strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE), SERVER_ACK) == 0)
         {
             printf ("receive ACK from decoder\n");
             decode_complete_ack = true;
             // send ack to relay node
-            generate_normal_packet (&tx_packet[0],
-                                    (uint8_t*)CLIENT_ACK,
-                                    sizeof CLIENT_ACK);
+            uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)CLIENT_ACK);
+            generate_normal_packet (&tx_packet[0], ack_packet, ack_packet_length);
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;

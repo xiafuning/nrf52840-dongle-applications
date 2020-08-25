@@ -126,9 +126,12 @@ int main(int argc, char *argv[])
     memset (recoder_symbol_coefficients, 0, sizeof recoder_symbol_coefficients);
     memset (recoder_coefficients, 0, sizeof recoder_coefficients);
 
-    uint32_t payload_length = recoder.symbol_size() + recoder.coefficient_vector_size();
-    uint8_t payload[payload_length];
-    memset (payload, 0, sizeof payload);
+    uint32_t packet_length = recoder.symbol_size() +
+                             recoder.coefficient_vector_size() +
+                             IPHC_TOTAL_SIZE +
+                             UDPHC_TOTAL_SIZE;
+    uint8_t packet[packet_length];
+    memset (packet, 0, sizeof packet);
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
 
@@ -143,7 +146,7 @@ int main(int argc, char *argv[])
             continue;
         // check for ack from encoder
         else if (rx_num > 0 &&
-                 strcmp ((const char*)extract_buf, CLIENT_ACK) == 0)
+                 strcmp ((const char*)(extract_buf + 10), CLIENT_ACK) == 0)
         {
             printf ("receive ACK from encoder\n");
             break;
@@ -157,19 +160,23 @@ int main(int argc, char *argv[])
         {
             printf ("recode a symbol\n");
             // read symbol and coding coefficients into the recoder
-            recoder.consume_symbol (extract_buf + recoder.coefficient_vector_size(),
-                                    extract_buf);
+            recoder.consume_symbol (extract_buf + recoder.coefficient_vector_size() +
+                                    IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                                    extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
             // generate recoding coefficients
             recoder.recoder_generate (recoder_coefficients);
             // write an encoded symbol based on the recoding coefficients
             recoder.recoder_produce_symbol (recoder_symbol,
                                             recoder_symbol_coefficients,
                                             recoder_coefficients);
-            // construct payload
-            memcpy (payload,
+            // construct packet
+            set_ip_header (packet);
+            set_udp_header (packet + IPHC_TOTAL_SIZE);
+            memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                     recoder_symbol_coefficients,
                     sizeof recoder_symbol_coefficients);
-            memcpy (payload + sizeof recoder_symbol_coefficients,
+            memcpy (packet + sizeof recoder_symbol_coefficients +
+                    IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                     recoder_symbol,
                     sizeof recoder_symbol);
             memset (extract_buf, 0, sizeof extract_buf);
@@ -178,16 +185,16 @@ int main(int argc, char *argv[])
         else
         {
             // construct payload
-            memcpy (payload, extract_buf, payload_length);
+            memcpy (packet, extract_buf, packet_length);
             rx_count++;
         }
 
         // forward packet
         // fragmentation
-        if (need_fragmentation (payload_length) == true)
+        if (need_fragmentation (packet_length) == true)
         {
             printf ("lowpan fragmentation needed\n");
-            do_fragmentation (tx_packet, payload, payload_length);
+            do_fragmentation (tx_packet, packet, packet_length);
             for (uint8_t j = 0; j < get_fragment_num(); j++)
             {
                 ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
@@ -198,7 +205,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            generate_normal_packet (&tx_packet[0], payload, payload_length);
+            generate_normal_packet (&tx_packet[0], packet, packet_length);
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;

@@ -12,9 +12,7 @@
 #define OTHER_FRAG_DATA_SIZE    88
 #define MAX_FRAG_NUM            ((MAX_PACKET_SIZE-(FIRST_FRAG_DATA_SIZE))/ \
                                 (OTHER_FRAG_DATA_SIZE) + 2)
-#define FIRST_FRAG_DATA_OFFSET  (FIRST_FRAG_HDR_SIZE+ \
-                                IPHC_TOTAL_SIZE+ \
-                                UDPHC_TOTAL_SIZE)
+#define FIRST_FRAG_DATA_OFFSET  FIRST_FRAG_HDR_SIZE
 #define OTHER_FRAG_DATA_OFFSET  OTHER_FRAG_HDR_SIZE
 
 
@@ -96,6 +94,21 @@ void set_ip_header (uint8_t* iphc_offset);
 void set_udp_header (uint8_t* udphc_offset);
 
 /**
+ * @brief get UDP header
+ */
+uint8_t* get_udp_header (uint8_t* packet);
+
+/**
+ * @brief set UDP checksum
+ */
+void set_udp_checksum (uint8_t* udphc_offset);
+
+/**
+ * @brief get UDP checksum
+ */
+uint16_t get_udp_checksum (uint8_t* checksum_offset);
+
+/**
  * @brief function for getting fragment number
  */
 uint8_t get_fragment_num (void);
@@ -104,5 +117,10 @@ uint8_t get_fragment_num (void);
  * @brief function for getting tail payload size
  */
 uint8_t get_tail_size (void);
+
+/**
+ * @brief generate an ack packet
+ */
+uint8_t generate_ack_packet (uint8_t* packet, uint8_t* ack);
 
 #endif /* LOWPAN_H */

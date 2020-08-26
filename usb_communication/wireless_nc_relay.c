@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         else if (rx_num > 0 &&
                  strcmp ((const char*)(extract_buf + 10), CLIENT_ACK) == 0)
         {
-            printf ("receive ACK from encoder\n");
+            printf ("receive ACK from encoder/client\n");
             break;
         }
         else if (rx_num == -1)

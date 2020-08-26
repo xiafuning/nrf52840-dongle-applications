@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "serial.h"
 #include "lowpan.h"
@@ -19,6 +20,8 @@
 
 #define USB_DEVICE "/dev/ttyACM0"
 #define MAX_SIZE 128
+
+static uint16_t rx_count = 0;
 
 static struct option long_options[] =
 {
@@ -53,8 +56,17 @@ void print_nc_config (kodo_rlnc::pure_recoder* recoder,
     printf ("---------NC configuration---------\n");
 }
 
+void sigint_handler(int signal)
+{
+    printf ("\npacket total forward: %u\n", rx_count);
+    exit(0);
+}
+
 int main(int argc, char *argv[])
 {
+    // set SIGINT handler
+    signal(SIGINT, sigint_handler);
+
     char* serial_port = (char*)USB_DEVICE;
     uint32_t symbol_size = 4;
     uint32_t generation_size = 10;
@@ -102,7 +114,6 @@ int main(int argc, char *argv[])
 
     int ret;
     int rx_num = 0;
-    uint16_t rx_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
     memset (extract_buf, 0, sizeof extract_buf);
 

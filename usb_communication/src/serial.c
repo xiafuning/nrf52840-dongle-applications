@@ -200,8 +200,6 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
         if (is_frame_format_correct (rx_buf) == false)
         {
             // if not, reset reassembler
-            printf ("incorrect format\n");
-            print_payload (rx_buf, rx_num);
             init_reassembler ();
             first_frame = true;
             first_frame_tail_exist = false;

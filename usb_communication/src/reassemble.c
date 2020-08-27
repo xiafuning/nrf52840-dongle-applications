@@ -149,7 +149,9 @@ bool is_new_packet (uint8_t* frame)
  */
 bool is_first_fragment (uint8_t* frame)
 {
-    if ((*frame) >> 5 == 0x06) // 0b1100 0000 >> 5 = 0b0000 0110
+    if (((*frame) & 0xf8) == k_first_frag_type_mask &&
+        *(frame + 4) == 'I' &&
+        *(frame + 7) == 'U')
         return true;
     else
         return false;

@@ -25,42 +25,49 @@ static struct option long_options[] =
     {"port",        required_argument, 0, 'p'},
     {"symbolSize",  required_argument, 0, 's'},
     {"genSize",     required_argument, 0, 'g'},
+    {"redundancy",  required_argument, 0, 'r'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
 void usage(void)
 {
-    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-h --help]\n");
+    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>][-h --help]\n");
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tsymbol size\t\t\tDefault: 4\n");
     printf ("\t-g --genSize\tgeneration size\t\t\tDefault: 10\n");
+    printf ("\t-r --redundancy\tredundancy in percent\t\tDefault: 20\n");
     printf ("\t-h --help\tthis help documetation\n");
 }
 
-void print_nc_config (kodo_rlnc::encoder* encoder)
+void print_nc_config (kodo_rlnc::encoder* encoder,
+                      float redundancy,
+                      uint16_t total_tx_num)
 {
     // print configuration
     printf ("---------NC configuration---------\n");
     printf ("encoder symbol size:\t\t%u\n", encoder->symbol_size());
     printf ("encoder coeff vector size:\t%u\n", encoder->coefficient_vector_size());
     printf ("encoder payload size:\t\t%u\n", encoder->max_payload_size());
+    printf ("redundancy ratio:\t\t%.2f\n", redundancy);
+    printf ("total tx packets:\t\t%u\n", total_tx_num);
     printf ("---------NC configuration---------\n");
-
 }
 
 int main(int argc, char *argv[])
 {
+    // cmd argument related variables
     char* serial_port = (char*)USB_DEVICE;
     uint32_t symbol_size = 4;
     uint32_t generation_size = 10;
+    float redundancy = 0.2;
 
     // cmd arguments parsing
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long (argc, argv, "p:s:g:h", long_options, &option_index)) != -1)
+    while ((opt = getopt_long (argc, argv, "p:s:g:r:h", long_options, &option_index)) != -1)
     {
         switch (opt)
         {
@@ -72,6 +79,9 @@ int main(int argc, char *argv[])
                 break;
             case 'g':
                 generation_size = atoi (optarg);
+                break;
+            case 'r':
+                redundancy = (float)atoi (optarg) / 100;
                 break;
             case 'h':
                 usage ();
@@ -93,13 +103,21 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    uint32_t inter_frame_interval = 100000; // inter frame interval in us
+    // variable definitions
+    uint32_t inter_frame_interval = 50000; // inter frame interval in us
     int ret;
     bool decode_complete_ack = false;
     int rx_num = 0;
     uint8_t rx_buf[MAX_SIZE];
     memset (rx_buf, 0, sizeof rx_buf);
-    uint16_t tx_count = 0;
+    uint16_t tx_frame_count = 0;
+    uint16_t tx_packet_count = 0;
+    uint16_t total_tx_num = generation_size * (1 + redundancy);
+    // time related variables
+    struct timeval send_start, send_end;
+    memset (&send_start, 0, sizeof send_start);
+    memset (&send_end, 0, sizeof send_end);
+    uint64_t total_time_used = 0; // us
 
     // encoder initialization
     // set finite field size
@@ -133,10 +151,10 @@ int main(int argc, char *argv[])
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
 
-    print_nc_config (&encoder);
+    print_nc_config (&encoder, redundancy, total_tx_num);
 
     // client operations
-    while (decode_complete_ack == false)
+    while (tx_packet_count < total_tx_num)
     {
         // generate coding coefficients for an encoded packet
         encoder.generate (encoder_symbol_coefficients);
@@ -153,6 +171,10 @@ int main(int argc, char *argv[])
                 sizeof encoder_symbol_coefficients,
                 encoder_symbol,
                 sizeof encoder_symbol);
+
+        // mark start time
+        gettimeofday (&send_start, NULL);
+
         // fragmentation
         if (need_fragmentation (packet_length) == true)
         {
@@ -164,9 +186,10 @@ int main(int argc, char *argv[])
                 if (ret < 0)
                     return -1;
                 printf ("send a frame\n");
+                tx_frame_count++;
                 usleep (inter_frame_interval);
             }
-            tx_count++;
+            tx_packet_count++;
         }
         else
         {
@@ -175,9 +198,16 @@ int main(int argc, char *argv[])
             if (ret < 0)
                 return -1;
             printf ("send a packet\n");
-            tx_count++;
+            tx_frame_count++;
+            tx_packet_count++;
             usleep (inter_frame_interval);
         }
+
+        // mark end time
+        gettimeofday (&send_end, NULL);
+        total_time_used += 1000000 * (send_end.tv_sec - send_start.tv_sec) +
+                           send_end.tv_usec - send_start.tv_usec;
+
         // check for ack from decoder
         rx_num = read_serial_port (fd, rx_buf);
         if (rx_num > 0 &&
@@ -191,13 +221,17 @@ int main(int argc, char *argv[])
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;
+            break;
         }
         else if (rx_num == -1)
         {
             fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
             break;
         }
-    }
-    printf ("packet total send: %u\n", tx_count);
+    } // end of while
+    if (decode_complete_ack == false)
+        printf ("decode failure\n");
+    printf ("packet total send: %u\n", tx_packet_count);
+    printf ("frame total send: %u\n", tx_frame_count);
     return 0;
 }

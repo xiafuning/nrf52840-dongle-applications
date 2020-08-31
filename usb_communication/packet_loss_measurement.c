@@ -97,10 +97,10 @@ int main(int argc, char *argv[])
 
     uint32_t seq = 0;
     uint32_t num_packets = 100;
-    uint32_t payload_length = 70;
+    uint32_t payload_length = 30;
     uint8_t tx_length = 0;
     uint32_t rx_counter = 0;
-    uint32_t inter_packet_interval = 10000; // inter packet interval in us
+    uint32_t inter_packet_interval = 50000; // inter packet interval in us
     int ret;
 
     if (client)

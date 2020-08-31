@@ -84,7 +84,8 @@ int main(int argc, char *argv[])
     int rx_num = 0;
     uint8_t rx_buf[MAX_SIZE];
     memset (rx_buf, 0, sizeof rx_buf);
-    uint16_t tx_count = 0;
+    uint16_t tx_packet_count = 0;
+    uint16_t tx_frame_count = 0;
     uint16_t ack_rx_num = 0;
     uint16_t data_offset = 0;
     uint16_t ack_timeout = 100; // ack timeout in ms
@@ -135,9 +136,10 @@ int main(int argc, char *argv[])
                     ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
                     if (ret < 0)
                         return -1;
+                    tx_frame_count++;
                     printf ("send a frame\n");
                 }
-                tx_count++;
+                tx_packet_count++;
             }
             else
             {
@@ -145,7 +147,8 @@ int main(int argc, char *argv[])
                 if (ret < 0)
                     return -1;
                 printf ("send a packet\n");
-                tx_count++;
+                tx_frame_count++;
+                tx_packet_count++;
             }
 
             clock_t timeout_start = clock();
@@ -173,7 +176,8 @@ int main(int argc, char *argv[])
         // reset packet buffer
         memset (packet, 0, sizeof packet);
     } // end of while (ack_rx_num)
-    printf ("packet total send: %u\n", tx_count);
+    printf ("packet total send: %u\n", tx_packet_count);
+    printf ("frame total send: %u\n", tx_frame_count);
     // send ack to relay node 5 times
     for (uint8_t i = 0; i < 3; i++)
     {

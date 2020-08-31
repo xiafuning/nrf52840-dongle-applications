@@ -117,14 +117,14 @@ uint8_t copy_frame_tail (uint8_t* frame_tail, uint8_t length)
  */
 void copy_payload (uint8_t* frame, uint16_t length)
 {
-    if ((*frame & k_other_frag_type_mask) == k_other_frag_type_mask) // other fragment
+    if (is_first_fragment (frame) == false) // other fragment
     {
         memcpy (&m_reassembler.reassemble_buffer[get_datagram_offset (frame + 4)],
                 frame + OTHER_FRAG_DATA_OFFSET,
                 length - OTHER_FRAG_DATA_OFFSET);
         m_reassembler.filled_size += length - OTHER_FRAG_DATA_OFFSET;
     }
-    else if ((*frame & k_first_frag_type_mask) == k_first_frag_type_mask) // first fragment
+    else if (is_first_fragment(frame) == true) // first fragment
     {
         memcpy (&m_reassembler.reassemble_buffer[0],
                 frame + FIRST_FRAG_DATA_OFFSET,
@@ -201,8 +201,16 @@ bool is_reassembler_running (void)
 bool is_frame_format_correct (uint8_t* frame)
 {
     // check for non-fragmented packet
-    if ((*(frame + 1)) == 'I' && (*(frame + 2)) == 'I' && (*(frame + 3)) == 'U')
+    if (is_reassembler_running () == false &&
+        (*(frame + 1)) == 'I' &&
+        (*(frame + 2)) == 'I' &&
+        (*(frame + 3)) == 'U')
         return true;
+    else if (is_reassembler_running () == true &&
+             (*(frame + 1)) == 'I' &&
+             (*(frame + 2)) == 'I' &&
+             (*(frame + 3)) == 'U')
+        return false;
 
     // check for fragmented packet
     // one packet is in reassembling and

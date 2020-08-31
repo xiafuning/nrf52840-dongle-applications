@@ -129,12 +129,19 @@ int main(int argc, char *argv[])
         rx_num = read_serial_port (fd, extract_buf);
         if (rx_num == 0)
             continue;
-        // read symbol and coding coefficients into the decoder
-        decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size() +
-                                IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-                                extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
-        memset (extract_buf, 0, sizeof extract_buf);
-        rx_count++;
+        else if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
+                                     UDPHC_TOTAL_SIZE +
+                                     decoder.coefficient_vector_size() +
+                                     decoder.symbol_size())
+        {
+            print_payload (extract_buf, rx_num);
+            // read symbol and coding coefficients into the decoder
+            decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size() +
+                                    IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                                    extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
+            memset (extract_buf, 0, sizeof extract_buf);
+            rx_count++;
+        }
     } // end of while
     printf ("decode complete!\n");
     // send ACK message

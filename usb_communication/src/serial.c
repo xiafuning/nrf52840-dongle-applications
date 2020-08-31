@@ -211,20 +211,11 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
         // process received packet
         if (need_reassemble (rx_buf)) // fragmented packet
         {
-            if (// last packet is reassembled and receive
-                // first frame of a new packet
-                (is_reassembler_running () == false &&
+            if (// receive first frame of a packet
+                // and make sure part of the payload is
+                // included to avoid segmentation fault
                 is_first_fragment (rx_buf) == true &&
-                rx_num > FIRST_FRAG_DATA_OFFSET) ||
-                // last packet is in reassembling and receive
-                // first frame of a new packet (at least one
-                // fragment of last packet is lost)
-                (is_reassembler_running () == true &&
-                is_new_packet (rx_buf) == true &&
-                is_first_fragment (rx_buf) == true &&
-                // make sure part of the payload is included
-                // avoid segmentation fault
-                rx_num > FIRST_FRAG_DATA_OFFSET))
+                rx_num > FIRST_FRAG_DATA_OFFSET)
             {
                 start_new_reassemble (rx_buf);
                 if (first_frame == true)

@@ -209,7 +209,7 @@ int main(int argc, char *argv[])
                            send_end.tv_usec - send_start.tv_usec;
 
         // check for ack from decoder
-        rx_num = read_serial_port (fd, rx_buf);
+        rx_num = read_serial_port (fd, rx_buf, NULL);
         if (rx_num > 0 &&
             strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE), SERVER_ACK) == 0)
         {

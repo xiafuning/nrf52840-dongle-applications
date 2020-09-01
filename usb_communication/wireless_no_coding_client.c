@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
             while ((clock() - timeout_start) * 1000 / CLOCKS_PER_SEC < ack_timeout)
             {
                 // check for ack from server
-                rx_num = read_serial_port (fd, rx_buf);
+                rx_num = read_serial_port (fd, rx_buf, NULL);
                 if (rx_num > 0 &&
                     strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE),
                             SERVER_ACK) == 0)
@@ -172,6 +172,7 @@ int main(int argc, char *argv[])
                     break;
                 }
             }
+            printf ("ack timeout!\n");
         } // end of while (tx_success)
         // reset packet buffer
         memset (packet, 0, sizeof packet);

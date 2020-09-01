@@ -84,7 +84,8 @@ int main(int argc, char *argv[])
 
     int ret;
     int rx_num = 0;
-    uint16_t rx_count = 0;
+    uint16_t rx_packet_count = 0;
+    uint16_t rx_frame_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
     memset (extract_buf, 0, sizeof extract_buf);
     uint16_t last_udp_checksum = 0;
@@ -104,10 +105,10 @@ int main(int argc, char *argv[])
     generate_normal_packet (&ack_buf, ack_packet, ack_packet_length);
 
     // server operations
-    while (rx_count < generation_size)
+    while (rx_packet_count < generation_size)
     {
         // receive a packet
-        rx_num = read_serial_port (fd, extract_buf);
+        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
         if (rx_num == 0)
             continue;
         //print_payload (extract_buf, rx_num);
@@ -125,7 +126,7 @@ int main(int argc, char *argv[])
                 return -1;
             memset (extract_buf, 0, sizeof extract_buf);
             data_offset += symbol_size;
-            rx_count++;
+            rx_packet_count++;
         }
         else
         {
@@ -135,10 +136,10 @@ int main(int argc, char *argv[])
             if (ret < 0)
                 return -1;
         }
-        printf ("rx_count: %u\n", rx_count);
     } // end of while
     printf ("receive complete!\n");
     //print_payload (data_out, sizeof data_out);
-    printf ("packet total receive: %u\n", rx_count);
+    printf ("packet total receive: %u\n", rx_packet_count);
+    printf ("frame total receive: %u\n", rx_frame_count);
     return 0;
 }

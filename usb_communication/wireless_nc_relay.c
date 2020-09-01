@@ -21,7 +21,8 @@
 #define USB_DEVICE "/dev/ttyACM0"
 #define MAX_SIZE 128
 
-static uint16_t rx_count = 0;
+static uint16_t rx_packet_count = 0;
+static uint16_t rx_frame_count = 0;
 
 static struct option long_options[] =
 {
@@ -58,7 +59,8 @@ void print_nc_config (kodo_rlnc::pure_recoder* recoder,
 
 void sigint_handler(int signal)
 {
-    printf ("\npacket total forward: %u\n", rx_count);
+    printf ("\npacket total forward: %u\n", rx_packet_count);
+    printf ("frame total forward: %u\n", rx_frame_count);
     exit(0);
 }
 
@@ -152,7 +154,7 @@ int main(int argc, char *argv[])
     while (true)
     {
         // receive a packet
-        rx_num = read_serial_port (fd, extract_buf);
+        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
         if (rx_num == 0)
             continue;
         // check for ack from encoder
@@ -191,13 +193,13 @@ int main(int argc, char *argv[])
                     recoder_symbol,
                     sizeof recoder_symbol);
             memset (extract_buf, 0, sizeof extract_buf);
-            rx_count++;
+            rx_packet_count++;
         }
         else
         {
             // construct payload
             memcpy (packet, extract_buf, packet_length);
-            rx_count++;
+            rx_packet_count++;
         }
 
         // forward packet
@@ -223,6 +225,7 @@ int main(int argc, char *argv[])
             printf ("forward a packet\n");
         }
     } // end of while
-    printf ("packet total forward: %u\n", rx_count);
+    printf ("packet total forward: %u\n", rx_packet_count);
+    printf ("frame total forward: %u\n", rx_frame_count);
     return 0;
 }

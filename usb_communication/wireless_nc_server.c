@@ -95,7 +95,8 @@ int main(int argc, char *argv[])
 
     int ret;
     int rx_num = 0;
-    uint16_t rx_count = 0;
+    uint16_t rx_packet_count = 0;
+    uint16_t rx_frame_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
     memset (extract_buf, 0, sizeof extract_buf);
 
@@ -126,7 +127,7 @@ int main(int argc, char *argv[])
     while (decoder.is_complete() == false)
     {
         // receive a packet
-        rx_num = read_serial_port (fd, extract_buf);
+        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
         if (rx_num == 0)
             continue;
         else if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
@@ -140,7 +141,7 @@ int main(int argc, char *argv[])
                                     IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                                     extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
             memset (extract_buf, 0, sizeof extract_buf);
-            rx_count++;
+            rx_packet_count++;
         }
     } // end of while
     printf ("decode complete!\n");
@@ -150,6 +151,7 @@ int main(int argc, char *argv[])
         return -1;
 
     print_payload (data_out, sizeof data_out);
-    printf ("packet total receive: %u\n", rx_count);
+    printf ("packet total receive: %u\n", rx_packet_count);
+    printf ("frame total receive: %u\n", rx_frame_count);
     return 0;
 }

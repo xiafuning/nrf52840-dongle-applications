@@ -140,7 +140,7 @@ tx_buf_t* serial_fragmentation (uint8_t* data, int length)
     return &m_tx_buf;
 }
 
-uint16_t read_serial_port (int fd, uint8_t* extract_buf)
+uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_count)
 {
     // parameter definitions
     int rx_num = 0;
@@ -211,6 +211,8 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
         // process received packet
         if (need_reassemble (rx_buf)) // fragmented packet
         {
+            if (rx_frame_count != NULL)
+                (*rx_frame_count)++;
             if (// receive first frame of a packet
                 // and make sure part of the payload is
                 // included to avoid segmentation fault
@@ -268,6 +270,8 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf)
                 continue;
             }
             printf ("receive a packet\n");
+            if (rx_frame_count != NULL)
+                (*rx_frame_count)++;
             memcpy (extract_buf, rx_buf, rx_num);
             return (uint16_t)rx_num;
         }

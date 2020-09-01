@@ -23,5 +23,5 @@ bool need_serial_fragmentation (int length);
 
 tx_buf_t* serial_fragmentation (uint8_t* data, int length);
 
-uint16_t read_serial_port (int fd, uint8_t* extract_buf);
+uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_count);
 #endif /* SERIAL_H */

@@ -142,11 +142,11 @@ int main(int argc, char *argv[])
     encoder.set_symbols_storage (data_in);
 
     // set data packet buffer
-    uint32_t packet_length = encoder.symbol_size() +
-             encoder.coefficient_vector_size() +
-             IPHC_TOTAL_SIZE +
-             UDPHC_TOTAL_SIZE;
-    uint8_t packet[packet_length];
+    uint32_t tx_packet_length = 0;
+    uint8_t packet[encoder.symbol_size() +
+                   encoder.coefficient_vector_size() +
+                   IPHC_TOTAL_SIZE +
+                   UDPHC_TOTAL_SIZE];
     memset (packet, 0, sizeof packet);
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
@@ -156,30 +156,54 @@ int main(int argc, char *argv[])
     // client operations
     while (tx_packet_count < total_tx_num)
     {
-        // generate coding coefficients for an encoded packet
-        encoder.generate (encoder_symbol_coefficients);
-        // write encoded symbol corresponding to the coding coefficients
-        encoder.produce_symbol (encoder_symbol,
-                                encoder_symbol_coefficients);
-        // construct packet
-        set_ip_header (packet);
-        set_udp_header (packet + IPHC_TOTAL_SIZE);
-        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-                encoder_symbol_coefficients,
-                sizeof encoder_symbol_coefficients);
-        memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE +
-                sizeof encoder_symbol_coefficients,
-                encoder_symbol,
-                sizeof encoder_symbol);
+        if (tx_packet_count < generation_size) // systematic phase
+        {
+            // generate systematic symbol
+            encoder.produce_systematic_symbol (encoder_symbol, tx_packet_count);
+            // construct packet
+            set_ip_header (packet);
+            set_udp_header (packet + IPHC_TOTAL_SIZE);
+            // set index of systematic packet
+            *(packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE) = (uint8_t)tx_packet_count;
+            memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof (uint8_t),
+                    encoder_symbol,
+                    sizeof encoder_symbol);
+            tx_packet_length = IPHC_TOTAL_SIZE +
+                               UDPHC_TOTAL_SIZE +
+                               sizeof (uint8_t) +
+                               sizeof encoder_symbol;
+        }
+        else // coding phase
+        {
+            // generate coding coefficients for an encoded packet
+            encoder.generate (encoder_symbol_coefficients);
+            // write encoded symbol corresponding to the coding coefficients
+            encoder.produce_symbol (encoder_symbol,
+                                    encoder_symbol_coefficients);
+            // construct packet
+            set_ip_header (packet);
+            set_udp_header (packet + IPHC_TOTAL_SIZE);
+            memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                    encoder_symbol_coefficients,
+                    sizeof encoder_symbol_coefficients);
+            memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE +
+                    sizeof encoder_symbol_coefficients,
+                    encoder_symbol,
+                    sizeof encoder_symbol);
+            tx_packet_length = IPHC_TOTAL_SIZE +
+                               UDPHC_TOTAL_SIZE +
+                               sizeof encoder_symbol_coefficients +
+                               sizeof encoder_symbol;
+        }
 
         // mark start time
         gettimeofday (&send_start, NULL);
 
         // fragmentation
-        if (need_fragmentation (packet_length) == true)
+        if (need_fragmentation (tx_packet_length) == true)
         {
             printf ("lowpan fragmentation needed\n");
-            do_fragmentation (tx_packet, packet, packet_length);
+            do_fragmentation (tx_packet, packet, tx_packet_length);
             for (uint8_t j = 0; j < get_fragment_num(); j++)
             {
                 ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
@@ -193,7 +217,7 @@ int main(int argc, char *argv[])
         }
         else
         {
-            generate_normal_packet (&tx_packet[0], packet, packet_length);
+            generate_normal_packet (&tx_packet[0], packet, tx_packet_length);
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;

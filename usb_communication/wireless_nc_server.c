@@ -134,15 +134,27 @@ int main(int argc, char *argv[])
                                      UDPHC_TOTAL_SIZE +
                                      decoder.coefficient_vector_size() +
                                      decoder.symbol_size())
+        // receive a coded packet
         {
             print_payload (extract_buf, rx_num);
             // read symbol and coding coefficients into the decoder
             decoder.consume_symbol (extract_buf + decoder.coefficient_vector_size() +
                                     IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                                     extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
-            memset (extract_buf, 0, sizeof extract_buf);
             rx_packet_count++;
         }
+        else if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
+                                     UDPHC_TOTAL_SIZE +
+                                     sizeof (uint8_t) +
+                                     decoder.symbol_size())
+        // receive a systematic packet
+        {
+            decoder.consume_systematic_symbol
+                (extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof (uint8_t),
+                *(extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE));
+            rx_packet_count++;
+        }
+        memset (extract_buf, 0, sizeof extract_buf);
     } // end of while
     printf ("decode complete!\n");
     // send ACK message

@@ -15,31 +15,59 @@
 #include "reassemble.h"
 #include "config.h"
 
-#define USB_DEVICE "/dev/ttyACM0"
-#define MAX_SIZE 128
+#define USB_DEVICE  "/dev/ttyACM0"
+#define LOG_FILE    "log.dump"
+#define MAX_SIZE    128
 
 static struct option long_options[] =
 {
     {"port",        required_argument, 0, 'p'},
     {"symbolSize",  required_argument, 0, 's'},
     {"genSize",     required_argument, 0, 'g'},
+    {"logFile",     required_argument, 0, 'l'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
 void usage(void)
 {
-    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-h --help]\n");
+    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-l --logFile <log file name>] [-h --help]\n");
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tpayload size\t\t\tDefault: 4\n");
     printf ("\t-g --genSize\tnumber of packets to be sent\t\t\tDefault: 10\n");
+    printf ("\t-l --logFile\tlog file name\t\t\tDefault: log.dump\n");
     printf ("\t-h --help\tthis help documetation\n");
 }
+
+int write_measurement_log (char* log_file_name,
+                           uint16_t tx_packet_count,
+                           uint32_t symbol_size,
+                           uint32_t generation_size)
+{
+    FILE* fp;
+    float loss_rate = 0;
+    fp = fopen (log_file_name, "a+");
+    if (fp == NULL)
+    {
+        fprintf (stderr, "error %d opening %s: %s\n", errno, log_file_name, strerror (errno));
+        return -1;
+    }
+    loss_rate = (float)(tx_packet_count - 1) / tx_packet_count;
+
+    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
+            symbol_size * generation_size,
+            loss_rate,
+            tx_packet_count);
+    fclose(fp);
+    return 0;
+}
+
 
 int main(int argc, char *argv[])
 {
     char* serial_port = (char*)USB_DEVICE;
+    char* log_file_name = (char*)LOG_FILE;
     uint32_t symbol_size = 4;
     uint32_t generation_size = 10;
 
@@ -47,7 +75,7 @@ int main(int argc, char *argv[])
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long (argc, argv, "p:s:g:h", long_options, &option_index)) != -1)
+    while ((opt = getopt_long (argc, argv, "p:s:g:l:h", long_options, &option_index)) != -1)
     {
         switch (opt)
         {
@@ -59,6 +87,9 @@ int main(int argc, char *argv[])
                 break;
             case 'g':
                 generation_size = atoi (optarg);
+                break;
+            case 'l':
+                log_file_name = optarg;
                 break;
             case 'h':
                 usage ();
@@ -188,5 +219,12 @@ int main(int argc, char *argv[])
         if (ret < 0)
             return -1;
     }
+
+    // write log to json file
+    write_measurement_log (log_file_name,
+                           tx_packet_count,
+                           symbol_size,
+                           generation_size);
+
     return 0;
 }

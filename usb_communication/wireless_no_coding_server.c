@@ -112,7 +112,8 @@ int main(int argc, char *argv[])
         if (rx_num == 0)
             continue;
         //print_payload (extract_buf, rx_num);
-        if (get_udp_checksum (get_udp_header (extract_buf) + 5) != last_udp_checksum)
+        else if (get_udp_checksum (get_udp_header (extract_buf) + 5) != last_udp_checksum &&
+                 (unsigned)rx_num == symbol_size + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE)
         {
             // save udp checksum
             last_udp_checksum = get_udp_checksum (get_udp_header (extract_buf) + 5);
@@ -128,7 +129,8 @@ int main(int argc, char *argv[])
             data_offset += symbol_size;
             rx_packet_count++;
         }
-        else
+        else if (get_udp_checksum (get_udp_header (extract_buf) + 5) != last_udp_checksum &&
+                 (unsigned)rx_num == symbol_size + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE)
         {
             // if receive the same packet again
             // send ACK message again
@@ -138,7 +140,14 @@ int main(int argc, char *argv[])
         }
     } // end of while
     printf ("receive complete!\n");
-    //print_payload (data_out, sizeof data_out);
+    // send extra acks back in case ack loss
+    for (uint8_t i = 0; i < 2; i++)
+    {
+         ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
+         if (ret < 0)
+           return -1;
+    }
+
     printf ("packet total receive: %u\n", rx_packet_count);
     printf ("frame total receive: %u\n", rx_frame_count);
     return 0;

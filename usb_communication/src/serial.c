@@ -4,6 +4,8 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
 
 #include "serial.h"
 #include "lowpan.h"
@@ -152,6 +154,10 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
     bool read_complete = false;
     uint8_t next_frame_size = 0;
 
+    // time related variable definition
+    clock_t frame_rx_timeout_start = 0;
+    uint32_t next_frame_rx_timeout = 60; // ms, hard coded
+
     init_reassembler ();
 
     while (read_complete == false)
@@ -172,8 +178,13 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         }
         else if (non_frag_frame_tail_exist == true)
         {
+            frame_rx_timeout_start = clock();
             do
+            {
                 rx_num += read (fd, rx_buf + rx_num, 1);
+                if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
+                    return 0;
+            }
             while (rx_num < *rx_buf);
             printf ("receive %d bytes total\n", rx_num);
             non_frag_frame_tail_exist = false;
@@ -182,8 +193,13 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         else
         {
             rx_num = 0;
+            frame_rx_timeout_start = clock();
             do
+            {
                 rx_num += read (fd, rx_buf + rx_num, 1);
+                if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
+                    return 0;
+            }
             while (rx_num < next_frame_size);
             // handle the case that first frame
             // is incomplete in the first rx

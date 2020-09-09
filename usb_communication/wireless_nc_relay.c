@@ -114,6 +114,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    uint32_t inter_frame_interval = 50000; // inter frame interval in us
     int ret;
     int rx_num = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
@@ -139,11 +140,10 @@ int main(int argc, char *argv[])
     memset (recoder_symbol_coefficients, 0, sizeof recoder_symbol_coefficients);
     memset (recoder_coefficients, 0, sizeof recoder_coefficients);
 
-    uint32_t packet_length = recoder.symbol_size() +
-                             recoder.coefficient_vector_size() +
-                             IPHC_TOTAL_SIZE +
-                             UDPHC_TOTAL_SIZE;
-    uint8_t packet[packet_length];
+    uint8_t packet[recoder.symbol_size() +
+                   recoder.coefficient_vector_size() +
+                   IPHC_TOTAL_SIZE +
+                   UDPHC_TOTAL_SIZE];
     memset (packet, 0, sizeof packet);
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
@@ -169,6 +169,9 @@ int main(int argc, char *argv[])
             fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
             break;
         }
+
+        print_payload (extract_buf, rx_num);
+
         if (recode_enable == true)
         {
             printf ("recode a symbol\n");
@@ -198,27 +201,29 @@ int main(int argc, char *argv[])
         else
         {
             // construct payload
-            memcpy (packet, extract_buf, packet_length);
+            memcpy (packet, extract_buf, rx_num);
             rx_packet_count++;
         }
 
         // forward packet
         // fragmentation
-        if (need_fragmentation (packet_length) == true)
+        if (need_fragmentation (rx_num) == true)
         {
             printf ("lowpan fragmentation needed\n");
-            do_fragmentation (tx_packet, packet, packet_length);
+            do_fragmentation (tx_packet, packet, rx_num);
             for (uint8_t j = 0; j < get_fragment_num(); j++)
             {
                 ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
                 if (ret < 0)
                     return -1;
                 printf ("forward a frame\n");
+                if (j != get_fragment_num() - 1)
+                    usleep (inter_frame_interval);
             }
         }
         else
         {
-            generate_normal_packet (&tx_packet[0], packet, packet_length);
+            generate_normal_packet (&tx_packet[0], packet, rx_num);
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;

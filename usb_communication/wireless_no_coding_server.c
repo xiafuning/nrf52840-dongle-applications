@@ -91,6 +91,10 @@ int main(int argc, char *argv[])
     uint16_t last_udp_checksum = 0;
     uint16_t data_offset = 0;
 
+    // time related variable definition
+    clock_t rx_timeout_start = 0;
+    uint32_t rx_timeout = 1500; // ms, hard coded
+
     // set buffers
     uint8_t data_out[symbol_size * generation_size];
     memset (data_out, 0, sizeof data_out);
@@ -104,9 +108,12 @@ int main(int argc, char *argv[])
     uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)SERVER_ACK);
     generate_normal_packet (&ack_buf, ack_packet, ack_packet_length);
 
+    rx_timeout_start = clock();
     // server operations
     while (rx_packet_count < generation_size)
     {
+        if ((clock() - rx_timeout_start) * 1000 / CLOCKS_PER_SEC > rx_timeout)
+            break;
         // receive a packet
         rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
         if (rx_num == 0)
@@ -139,14 +146,19 @@ int main(int argc, char *argv[])
                 return -1;
         }
     } // end of while
-    printf ("receive complete!\n");
-    // send extra acks back in case ack loss
-    for (uint8_t i = 0; i < 2; i++)
+    if (rx_packet_count == generation_size)
     {
-         ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
-         if (ret < 0)
-           return -1;
+        printf ("receive complete!\n");
+        // send extra acks back in case ack loss
+        for (uint8_t i = 0; i < 2; i++)
+        {
+            ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
+            if (ret < 0)
+                return -1;
+        }
     }
+    else
+        printf ("receive failure!\n");
 
     printf ("packet total receive: %u\n", rx_packet_count);
     printf ("frame total receive: %u\n", rx_frame_count);

@@ -41,9 +41,10 @@ void usage(void)
 }
 
 int write_measurement_log (char* log_file_name,
-                           uint16_t tx_packet_count,
+                           uint16_t tx_frame_count,
                            uint32_t symbol_size,
-                           uint32_t generation_size)
+                           uint32_t generation_size,
+                           bool tx_success)
 {
     FILE* fp;
     float loss_rate = 0;
@@ -53,12 +54,13 @@ int write_measurement_log (char* log_file_name,
         fprintf (stderr, "error %d opening %s: %s\n", errno, log_file_name, strerror (errno));
         return -1;
     }
-    loss_rate = (float)(tx_packet_count - 1) / tx_packet_count;
+    if (tx_success == false)
+        loss_rate = 1;
 
     fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
             symbol_size * generation_size,
             loss_rate,
-            tx_packet_count);
+            tx_frame_count);
     fclose(fp);
     return 0;
 }
@@ -119,7 +121,8 @@ int main(int argc, char *argv[])
     uint16_t tx_frame_count = 0;
     uint16_t ack_rx_num = 0;
     uint16_t data_offset = 0;
-    uint16_t ack_timeout = 100; // ack timeout in ms
+    uint16_t ack_timeout = 200; // ack timeout in ms
+    uint32_t inter_frame_interval = 50000; // inter frame interval in us
     bool tx_success = false;
 
     // set buffers
@@ -141,7 +144,8 @@ int main(int argc, char *argv[])
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
 
     // client operations
-    while (ack_rx_num < generation_size)
+    while (tx_packet_count / (MAX_RETRIES + 1) < generation_size &&
+           ack_rx_num < generation_size)
     {
         // reset flag
         tx_success = false;
@@ -157,7 +161,7 @@ int main(int argc, char *argv[])
         else
             generate_normal_packet (&tx_packet[0], packet, packet_length);
 
-        while (tx_success == false)
+        for (uint8_t i = 0; i < MAX_RETRIES + 1; i++)
         {
             // send a packet
             if (need_fragmentation (packet_length) == true)
@@ -169,6 +173,8 @@ int main(int argc, char *argv[])
                         return -1;
                     tx_frame_count++;
                     printf ("send a frame\n");
+                    if (j != get_fragment_num() - 1)
+                        usleep (inter_frame_interval);
                 }
                 tx_packet_count++;
             }
@@ -203,28 +209,21 @@ int main(int argc, char *argv[])
                     break;
                 }
             }
-            printf ("ack timeout!\n");
-        } // end of while (tx_success)
+            if (tx_success == true)
+                break;
+        } // end of for
         // reset packet buffer
         memset (packet, 0, sizeof packet);
     } // end of while (ack_rx_num)
     printf ("packet total send: %u\n", tx_packet_count);
     printf ("frame total send: %u\n", tx_frame_count);
-    // send ack to relay node 5 times
-    for (uint8_t i = 0; i < 3; i++)
-    {
-        uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)CLIENT_ACK);
-        generate_normal_packet (&tx_packet[0], ack_packet, ack_packet_length);
-        ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
-        if (ret < 0)
-            return -1;
-    }
 
     // write log to json file
     write_measurement_log (log_file_name,
-                           tx_packet_count,
+                           tx_frame_count,
                            symbol_size,
-                           generation_size);
+                           generation_size,
+                           tx_success);
 
     return 0;
 }

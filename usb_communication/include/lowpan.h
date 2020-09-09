@@ -15,6 +15,7 @@
 #define FIRST_FRAG_DATA_OFFSET  FIRST_FRAG_HDR_SIZE
 #define OTHER_FRAG_DATA_OFFSET  OTHER_FRAG_HDR_SIZE
 
+#define MAX_RETRIES             3
 
 typedef struct
 {

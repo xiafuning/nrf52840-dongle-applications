@@ -67,7 +67,7 @@ APP_USBD_CDC_ACM_GLOBAL_DEF(m_app_cdc_acm,
                             CDC_ACM_COMM_EPIN,
                             CDC_ACM_DATA_EPIN,
                             CDC_ACM_DATA_EPOUT,
-                            APP_USBD_CDC_COMM_PROTOCOL_AT_V250
+                            APP_USBD_CDC_COMM_PROTOCOL_NONE
 );
 
 app_usbd_cdc_acm_t const* usb_cdc_acm_inst_get()

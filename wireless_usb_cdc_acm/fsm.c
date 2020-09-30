@@ -66,6 +66,8 @@
 #define LED_CDC_ACM_RX      (BSP_BOARD_LED_2)
 #define LED_CDC_ACM_TX      (BSP_BOARD_LED_3)
 
+#define MAC_MAX_RETRIES     3
+
 typedef struct
 {
     mac_payload_descriptor_t   payload_descr;
@@ -88,11 +90,10 @@ typedef enum
 {
     GU_SET_SUCCESS,
     GU_SEND_SUCCESS,
-    GU_UART_TX_DATA_AVAILABLE,
     GU_RADIO_TX_IDLE,
-    GU_UART_TX_IDLE,
     GU_USB_CDC_ACM_TX_DATA_AVAILABLE,	// XFN_CHANGE
     GU_USB_CDC_ACM_TX_IDLE,				// XFN_CHANGE
+    GU_RADIO_MAX_RETRIES,               // XFN_CHANGE
 } fsm_guards_t;
 
 typedef enum
@@ -112,6 +113,7 @@ typedef enum
 #endif
     A_USB_CDC_ACM_TX_START,		// XFN_CHANGE
     A_USB_CDC_ACM_TX_IDLE_SET,	// XFN_CHANGE
+    A_MCPS_DATA_CONF_SEND,      // XFN_CHANGE
 } fsm_actions_t;
 
 typedef void (* fsm_action_t)(void *);
@@ -139,14 +141,14 @@ static void a_security_set(void * p_data);
 #endif
 static void a_usb_cdc_acm_tx_start(void * p_data);		// XFN_CHANGE
 static void a_usb_cdc_acm_tx_idle_set(void * p_data);	// XFN_CHANGE
+static void a_mcps_data_conf_send(void * p_data);	    // XFN_CHANGE
 
 static bool gu_set_success(void * p_data);
 static bool gu_send_success(void * p_data);
-static bool gu_uart_tx_data_available(void * p_data);
 static bool gu_radio_tx_idle(void * p_data);
-static bool gu_uart_tx_idle(void * p_data);
 static bool gu_usb_cdc_acm_tx_data_available(void * p_data);	// XFN_CHANGE
 static bool gu_usb_cdc_acm_tx_idle(void * p_data);				// XFN_CHANGE
+static bool gu_radio_max_retries(void * p_data);                // XFN_CHANGE
 
 static bool frames_available(void);
 
@@ -171,6 +173,9 @@ static const sys_fsm_transition_t m_transition_table[] =
     SYS_FSM_TRANSITION( E_USB_CDC_ACM_TX_DONE,	GU_USB_CDC_ACM_TX_DATA_AVAILABLE,	A_USB_CDC_ACM_TX_START,		SYS_FSM_SAME_STATE ),
     SYS_FSM_TRANSITION( E_USB_CDC_ACM_TX_DONE,	SYS_FSM_OTHERWISE,					A_USB_CDC_ACM_TX_IDLE_SET,	SYS_FSM_SAME_STATE ),
     SYS_FSM_TRANSITION( E_USB_CDC_ACM_RX_DONE,	GU_RADIO_TX_IDLE,					A_RADIO_TX_START,			SYS_FSM_SAME_STATE ),
+    SYS_FSM_TRANSITION( E_RADIO_TX_SUCCESS,     GU_USB_CDC_ACM_TX_IDLE,             A_MCPS_DATA_CONF_SEND,      SYS_FSM_SAME_STATE ),
+    SYS_FSM_TRANSITION( E_RADIO_TX_NO_ACK,      GU_RADIO_MAX_RETRIES,               A_MCPS_DATA_CONF_SEND,      SYS_FSM_SAME_STATE ),
+    SYS_FSM_TRANSITION( E_RADIO_TX_NO_ACK,      SYS_FSM_OTHERWISE,                  A_RADIO_TX_RESTART,         SYS_FSM_SAME_STATE ),
 
     SYS_FSM_STATE     ( S_INITIAL ),
     SYS_FSM_TRANSITION( E_START_CONFIG,      SYS_FSM_ALWAYS,            A_CHANNEL_SET,                 S_SETTING_CH ),
@@ -222,8 +227,8 @@ static mcps_data_req_t m_data_req;
 static mcps_data_conf_t m_data_conf;
 static bool m_uart_tx_idle = true;
 static bool m_usb_cdc_acm_tx_idle = true;	// XFN_CHANGE
-
 static size_t m_radio_tx_size = 0;          // XFN_CHANGE
+static uint8_t m_data_conf_tx_buffer[4];    // XFN_CHANGE
 
 static bool m_radio_tx_idle = true;
 static uint8_t m_radio_tx_buffer[PHY_MAX_PACKET_SIZE + MAC_MAX_MHR_SIZE];
@@ -231,7 +236,7 @@ static sequence_number_t tx_sequence_number = 0;
 #if (CONFIG_SECURE == 1)
 static uint8_t m_radio_tx_buffer_shadow[MAX_MSDU_SIZE + MAX_APP_SEQUENCE_NUMBER_SIZE];
 #endif
-static uint8_t m_events = 0;
+static uint16_t m_events = 0;
 static store_data_handler_t event_data_store[EVENTS_AMOUNT] =
 {
     NULL,                 // E_START_CONFIG
@@ -243,6 +248,8 @@ static store_data_handler_t event_data_store[EVENTS_AMOUNT] =
     NULL,                 // E_SECURITY_SET
 	NULL,				  // E_USB_CDC_ACM_RX_DONE	// XFN_CHANGE
 	NULL,				  // E_USB_CDC_ACM_TX_DONE	// XFN_CHANGE
+    mcps_data_conf_store, // E_RADIO_TX_SUCCESS     // XFN_CHANGE
+    mcps_data_conf_store, // E_RADIO_TX_NO_ACK      // XFN_CHANGE
 };
 static fsm_frame_item_t m_radio_rx_array[CONFIG_POOL_SIZE / (PHY_MAX_PACKET_SIZE + PHY_MAX_HEADER_SIZE) + 1U];
 static size_t m_radio_rx_array_read_index = 0;
@@ -252,11 +259,10 @@ static const fsm_guard_t m_fsm_guards[] =
 {
     gu_set_success,
     gu_send_success,
-    gu_uart_tx_data_available,
     gu_radio_tx_idle,
-    gu_uart_tx_idle,
-    gu_usb_cdc_acm_tx_idle,				// XFN_CHANGE
     gu_usb_cdc_acm_tx_data_available,	// XFN_CHANGE
+    gu_usb_cdc_acm_tx_idle,				// XFN_CHANGE
+    gu_radio_max_retries,               // XFN_CHANGE
 };
 
 static const fsm_action_t m_fsm_actions[] =
@@ -276,6 +282,7 @@ static const fsm_action_t m_fsm_actions[] =
 #endif
     a_usb_cdc_acm_tx_start,		// XFN_CHANGE
     a_usb_cdc_acm_tx_idle_set,	// XFN_CHANGE
+    a_mcps_data_conf_send,      // XFN_CHANGE
 };
 
 static void fsm_action(sys_fsm_action_id_t action_id, void * p_data)
@@ -306,19 +313,9 @@ static bool gu_send_success(void * p_data)
     return m_data_conf.status == MAC_SUCCESS;
 }
 
-static bool gu_uart_tx_data_available(void * p_data)
-{
-    return frames_available();
-}
-
 static bool gu_radio_tx_idle(void * p_data)
 {
     return m_radio_tx_idle;
-}
-
-static bool gu_uart_tx_idle(void * p_data)
-{
-    return m_uart_tx_idle;
 }
 
 
@@ -514,7 +511,7 @@ static void a_radio_tx_start(void * p_data)
         m_data_req.msdu = (uint8_t *)&m_radio_tx_buffer[PAYLOAD_START_POSITION];
         m_data_req.msdu_length = m_radio_tx_size;
         m_data_req.msdu_handle++;
-        m_data_req.tx_options.ack = false;	// XFN_CHANGE, original value: true
+        m_data_req.tx_options.ack = true;	// XFN_CHANGE, original value: true
         m_data_req.tx_options.gts = false;
         m_data_req.tx_options.indirect = false;
 #if (CONFIG_SECURE == 1)
@@ -632,8 +629,13 @@ static void mcps_data_conf(mcps_data_conf_t * conf)
     {
         tx_sequence_number++;
 		bsp_board_led_invert(LED_CDC_ACM_TX);
+        fsm_event_post(E_RADIO_TX_SUCCESS, &data);
 	}
-    fsm_event_post(E_RADIO_TX_DONE, &data);
+    else
+    {
+        fsm_event_post(E_RADIO_TX_NO_ACK, &data);
+    }
+    //fsm_event_post(E_RADIO_TX_DONE, &data);
     //LEDS_OFF(BIT(CONFIG_UPSTREAM_PIN));
 }
 
@@ -675,6 +677,7 @@ void fsm_init(void)
 
 void fsm_event_post(fsm_events_t event, fsm_event_data_t * p_data)
 {
+
     m_events |= BIT(event);
     if (event_data_store[event] != NULL)
     {
@@ -688,7 +691,7 @@ void fsm_event_scheduler_run(void)
 {
     for (uint8_t event_id = 0; event_id < EVENTS_AMOUNT; event_id++)
     {
-        uint8_t mask = BIT(event_id);
+        uint16_t mask = BIT(event_id);
         if (m_events & mask)
         {
             m_events ^= mask;
@@ -754,4 +757,31 @@ static bool gu_usb_cdc_acm_tx_data_available(void * p_data)
 static bool gu_usb_cdc_acm_tx_idle(void * p_data)
 {
     return m_usb_cdc_acm_tx_idle;
+}
+
+static bool gu_radio_max_retries(void * p_data)
+{
+    if (m_data_conf.msdu_handle >= MAC_MAX_RETRIES + 1)
+        return true;
+    else
+        return false;
+}
+
+static void a_mcps_data_conf_send (void * p_data)
+{
+    // reset radio tx idle flag
+    m_radio_tx_idle = true;
+    app_usbd_cdc_acm_t const * p_usb_cdc_acm = usb_cdc_acm_inst_get();
+    // reset tx buffer
+    memset (m_data_conf_tx_buffer, 0, sizeof m_data_conf_tx_buffer);
+
+    memcpy (m_data_conf_tx_buffer, &m_data_conf.status, 1);
+    memcpy (m_data_conf_tx_buffer + 1, &m_data_conf.msdu_handle, 1);
+	memcpy (m_data_conf_tx_buffer + 2, &m_data_req.msdu_handle, 1);
+    // reset msdu handle, necessary
+    m_data_req.msdu_handle = 0;
+
+    app_usbd_cdc_acm_write(p_usb_cdc_acm,
+						   m_data_conf_tx_buffer,
+						   3);
 }

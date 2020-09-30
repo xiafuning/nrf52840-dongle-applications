@@ -48,7 +48,8 @@
 
 typedef uint8_t                           sequence_number_t;
 #define MAX_APP_SEQUENCE_NUMBER_SIZE      sizeof(sequence_number_t)
-#define MAX_MSDU_SIZE                     (PHY_MAX_PACKET_SIZE - MAC_MEMORY_RESERVE - MAX_APP_SEQUENCE_NUMBER_SIZE)
+//#define MAX_MSDU_SIZE                     (PHY_MAX_PACKET_SIZE - MAC_MEMORY_RESERVE - MAX_APP_SEQUENCE_NUMBER_SIZE)
+#define MAX_MSDU_SIZE                     120
 #define PAYLOAD_START_POSITION            (MAC_MAX_MHR_SIZE + MAX_APP_SEQUENCE_NUMBER_SIZE)
 #define COUNTER_POSITION                  (MAC_MAX_MHR_SIZE)
 
@@ -63,6 +64,8 @@ typedef enum
     E_SECURITY_SET,
 	E_USB_CDC_ACM_RX_DONE,	// XFN_CHANGE
 	E_USB_CDC_ACM_TX_DONE,	// XFN_CHANGE
+    E_RADIO_TX_SUCCESS,     // XFN_CHANGE
+    E_RADIO_TX_NO_ACK,      // XFN_CHANGE
     EVENTS_AMOUNT
 } fsm_events_t;
 

@@ -10,6 +10,7 @@ typedef struct
     uint8_t fragment_num;
     uint8_t rx_num_order[MAX_FRAG_NUM];
     uint8_t current_frame;
+    uint16_t last_datagram_offset;
     bool idle;
 } reassembler_t;
 
@@ -60,6 +61,11 @@ void copy_payload (uint8_t* frame, uint16_t length);
  * @brief check if a fragment belongs to a new packet
  */
 bool is_new_packet (uint8_t* frame);
+
+/**
+ * @brief check if a fragment is a new fragment
+ */
+bool is_new_fragment (uint8_t* frame);
 
 /**
  * @brief check if a fragment is the first fragment

@@ -84,6 +84,8 @@ int main(int argc, char *argv[])
 
     int ret;
     int rx_num = 0;
+    uint8_t rx_buf[MAX_SIZE];
+    memset (rx_buf, 0, sizeof rx_buf);
     uint16_t rx_packet_count = 0;
     uint16_t rx_frame_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
@@ -118,45 +120,23 @@ int main(int argc, char *argv[])
         rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
         if (rx_num == 0)
             continue;
-        //print_payload (extract_buf, rx_num);
         else if (get_udp_checksum (get_udp_header (extract_buf) + 5) != last_udp_checksum &&
                  (unsigned)rx_num == symbol_size + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE)
         {
+            print_payload (extract_buf, rx_num);
             // save udp checksum
             last_udp_checksum = get_udp_checksum (get_udp_header (extract_buf) + 5);
             // copy payload
             memcpy (data_out + data_offset,
                     extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                     rx_num - IPHC_TOTAL_SIZE - UDPHC_TOTAL_SIZE);
-            // send ACK message
-            ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
-            if (ret < 0)
-                return -1;
             memset (extract_buf, 0, sizeof extract_buf);
             data_offset += symbol_size;
             rx_packet_count++;
         }
-        else if (get_udp_checksum (get_udp_header (extract_buf) + 5) != last_udp_checksum &&
-                 (unsigned)rx_num == symbol_size + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE)
-        {
-            // if receive the same packet again
-            // send ACK message again
-            ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
-            if (ret < 0)
-                return -1;
-        }
     } // end of while
     if (rx_packet_count == generation_size)
-    {
         printf ("receive complete!\n");
-        // send extra acks back in case ack loss
-        for (uint8_t i = 0; i < 2; i++)
-        {
-            ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
-            if (ret < 0)
-                return -1;
-        }
-    }
     else
         printf ("receive failure!\n");
 

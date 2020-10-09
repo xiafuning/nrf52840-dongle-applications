@@ -11,6 +11,8 @@
 #include "lowpan.h"
 #include "reassemble.h"
 #include "utils.h"
+#include "config.h"
+
 
 // variable definitions
 static tx_buf_t m_tx_buf;
@@ -93,7 +95,7 @@ int write_serial_port (int fd, uint8_t* data, int length)
     if (need_serial_fragmentation (length) == true)
     {
         tx_buf_t* tx_buffer;
-        printf ("need serial fragmentation\n");
+        //printf ("need serial fragmentation\n");
         tx_buffer = serial_fragmentation (data, length);
         // send first serial fragment
         ret = write (fd, tx_buffer->buf_0, tx_buffer->buf_0_size);
@@ -153,12 +155,16 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
     bool non_frag_frame_tail_exist = false;
     bool read_complete = false;
     uint8_t next_frame_size = 0;
+    int ret = 0;
+    uint8_t ack_packet[64];
+    // construct ack packet
+    uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)SERVER_ACK);
 
     // time related variable definition
     clock_t frame_rx_timeout_start = 0;
     uint32_t next_frame_rx_timeout = 60; // ms, hard coded
 
-    init_reassembler ();
+    init_reassembler();
 
     while (read_complete == false)
     {
@@ -224,15 +230,20 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
             continue;
         }
 
-        // process received packet
+        // process received frame
         if (need_reassemble (rx_buf)) // fragmented packet
         {
+            // send ack
+            ret = write_serial_port (fd, ack_packet, ack_packet_length);
+            if (ret == -1)
+                return 0;
+            // update frame counter
             if (rx_frame_count != NULL)
                 (*rx_frame_count)++;
-            if (// receive first frame of a packet
-                // and make sure part of the payload is
-                // included to avoid segmentation fault
-                is_first_fragment (rx_buf) == true &&
+            // receive first frame of a packet
+            // and make sure part of the payload is
+            // included to avoid segmentation fault
+            if (is_first_fragment (rx_buf) == true &&
                 rx_num > FIRST_FRAG_DATA_OFFSET)
             {
                 start_new_reassemble (rx_buf);
@@ -245,7 +256,8 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
             }
             // receive a fragment of a known packet
             else if (is_reassembler_running () == true &&
-                     is_new_packet (rx_buf) == false)
+                     is_new_packet (rx_buf) == false &&
+                     is_new_fragment (rx_buf) == true)
                 next_frame_size = read_frame (rx_buf, rx_num);
             // other cases
             else
@@ -293,4 +305,28 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         }
     } // end of while
     return 0;
+}
+
+bool wait_ack (int fd, uint16_t ack_timeout, char* ack_message)
+{
+    uint8_t rx_buf[64];
+    int rx_num = 0;
+    memset (rx_buf, 0, sizeof rx_buf);
+    // wait for ack
+    clock_t timeout_start = clock();
+    while ((clock() - timeout_start) * 1000 / CLOCKS_PER_SEC < ack_timeout)
+    {
+        // check for ack from server
+        rx_num = read_serial_port (fd, rx_buf, NULL);
+        if (rx_num > 0 &&
+            strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE),
+                    ack_message) == 0)
+            return true;
+        else if (rx_num == -1)
+        {
+            fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
+            break;
+        }
+    }
+    return false;
 }

@@ -123,6 +123,8 @@ void copy_payload (uint8_t* frame, uint16_t length)
                 frame + OTHER_FRAG_DATA_OFFSET,
                 length - OTHER_FRAG_DATA_OFFSET);
         m_reassembler.filled_size += length - OTHER_FRAG_DATA_OFFSET;
+        // update last datagram offset
+        m_reassembler.last_datagram_offset = get_datagram_offset (frame + 4);
     }
     else if (is_first_fragment(frame) == true) // first fragment
     {
@@ -130,6 +132,8 @@ void copy_payload (uint8_t* frame, uint16_t length)
                 frame + FIRST_FRAG_DATA_OFFSET,
                 length - FIRST_FRAG_DATA_OFFSET);
         m_reassembler.filled_size += length - FIRST_FRAG_DATA_OFFSET;
+        // update last datagram offset
+        m_reassembler.last_datagram_offset = 0;
     }
 }
 
@@ -142,6 +146,14 @@ bool is_new_packet (uint8_t* frame)
         return true;
     else
         return false;
+}
+
+/**
+* @brief check if a fragment is a new fragment
+*/
+bool is_new_fragment (uint8_t* frame)
+{
+    return m_reassembler.last_datagram_offset != get_datagram_offset (frame + 4);
 }
 
 /**

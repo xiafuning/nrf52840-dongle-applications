@@ -255,7 +255,7 @@ uint8_t get_tail_size (void)
  */
 uint8_t generate_ack_packet (uint8_t* packet, uint8_t* ack)
 {
-    uint16_t length = 0;
+    uint8_t length = 0;
     set_ip_header (packet);
     set_udp_header (packet + IPHC_TOTAL_SIZE);
     if (*ack == 'c')
@@ -279,5 +279,7 @@ uint8_t generate_ack_packet (uint8_t* packet, uint8_t* ack)
         sizeof SERVER_ACK);
         length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof SERVER_ACK;
     }
+    // set packet length in first byte of packet
+    *packet = length;
     return length;
 }

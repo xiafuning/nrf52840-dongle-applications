@@ -32,27 +32,25 @@ def helpInfo():
 #===========================================
 def plotRetransmissionStat (data, fig, ax, measure_date):
 #===========================================
-    retx_stat = [0, 0, 0, 0]
+    retx_stat = {}
     for index in range (len (data)):
         if data[index]['type'] == 'no_coding':
-            if data[index]['tx_num'] == 4:
-                retx_stat[0] = retx_stat[0] + 1
-            elif data[index]['tx_num'] == 8:
-                retx_stat[1] = retx_stat[1] + 1
-            elif data[index]['tx_num'] == 12:
-                retx_stat[2] = retx_stat[2] + 1
-            elif data[index]['tx_num'] == 16:
-                retx_stat[3] = retx_stat[3] + 1
-    total_num = sum (retx_stat)
+            if retx_stat.has_key (data[index]['tx_num']) == True:
+                retx_stat[data[index]['tx_num']] = retx_stat[data[index]['tx_num']] + 1
+            else:
+                retx_stat[data[index]['tx_num']] = 1
+    sorted (retx_stat.keys())
+    total_num = sum (retx_stat.values())
     for index in range (len (retx_stat)):
-        retx_stat[index] = float (retx_stat[index]) / total_num
+        retx_stat[retx_stat.keys()[index]] = float (retx_stat[retx_stat.keys()[index]]) / total_num
 
-    x = np.arange(len(retx_stat))  # the label locations
-    ax.bar (x, retx_stat)
+    x = retx_stat.keys()  # the label locations
+    ax.bar (x, retx_stat.values())
+    ax.set_xticks (retx_stat.keys())
     ax.set_title ('one hop (channel loss ~30%)', fontsize=20)
     ax.set_xlabel ('number of retransmission', fontsize=20)
     ax.set_ylabel ('percentage', fontsize=20)
-    ax.set_ylim([0,1])
+    #ax.set_ylim([0,1])
     fig.savefig (fname='one_hop_%s_retx_stat.pdf' % measure_date, bbox_inches='tight')
 
 #===========================================
@@ -63,6 +61,10 @@ def getDate (json_file):
     else:
         return json_file[len (json_file) - 9 : len (json_file) - 5]
 
+#===========================================
+def getAverageChannelLoss (average_channel_loss_estimation):
+#===========================================
+    return int (sum (average_channel_loss_estimation) / len (average_channel_loss_estimation) / 10 * 1000)
 
 #===========================================
 def main():
@@ -191,22 +193,25 @@ def main():
 
     plt.rcParams.update({'font.size': 20})
     fig, ax = plt.subplots()
+    # plot loss statistics
     if plot_loss == True:
         ax.boxplot ([average_no_coding_loss_rate, average_nc_0_loss_rate, average_nc_50_loss_rate, average_nc_75_loss_rate, average_nc_100_loss_rate, []], labels=x, showmeans=True)
         ax.set_ylabel ('loss probability', fontsize=20)
-        ax.set_title ('one hop (channel loss ~30%)', fontsize=20)
+        ax.set_title ('one hop (channel loss ~%d%%)' % getAverageChannelLoss (average_channel_loss_estimation), fontsize=20)
         ax.set_xticks (x)
         ax.set_xticklabels (labels, fontsize=20, rotation=60, ha='right')
         #plt.grid (linestyle='--')
         fig.savefig (fname='one_hop_%s_loss.pdf' % measure_date, bbox_inches='tight')
+    # plot transmission statistics
     elif plot_tx == True:
         ax.boxplot ([average_no_coding_tx_num, nc_0_tx_num, nc_50_tx_num, nc_75_tx_num, nc_100_tx_num, []], labels=x, showmeans=True)
         ax.set_ylabel ('number of transmission', fontsize=20)
-        ax.set_title ('one hop (channel loss ~30%)', fontsize=20)
+        ax.set_title ('one hop (channel loss ~%d%%)' % getAverageChannelLoss (average_channel_loss_estimation), fontsize=20)
         ax.set_xticks(x)
         ax.set_xticklabels(labels, fontsize=20, rotation=60, ha='right')
         ax.set_ylim([0,16])
         fig.savefig (fname='one_hop_%s_tx.pdf' % measure_date, bbox_inches='tight')
+    # plot loss vs tx statistics
     elif plot_mix == True:
         point_chart = ax.plot(np.mean (average_no_coding_loss_rate), np.mean (average_no_coding_tx_num), 'ro', label='OT ARQ', ms=10)
         point_chart = ax.plot(np.mean (average_nc_0_loss_rate), np.mean (nc_0_tx_num), 'b*-', label='NC 4+0', ms=10)
@@ -219,7 +224,7 @@ def main():
         ax.add_line(l2)
         l3 = mlines.Line2D([np.mean (average_nc_75_loss_rate),np.mean (average_nc_100_loss_rate)], [np.mean (nc_75_tx_num),np.mean (nc_100_tx_num)], color='b')
         ax.add_line(l3)
-        ax.set_title ('one hop (channel loss ~30%)', fontsize=20)
+        ax.set_title ('one hop (channel loss ~%d%%)' % getAverageChannelLoss (average_channel_loss_estimation), fontsize=20)
         ax.set_xlabel ('loss probability', fontsize=20)
         ax.set_ylabel ('number of transmission', fontsize=20)
         ax.set_ylim([0,16])
@@ -234,10 +239,11 @@ def main():
                         ha='center', va='bottom',
                         fontsize=16)
         '''
+    # plot channel loss statistics
     elif plot_channel_loss == True:
         x = np.arange(len(average_channel_loss_estimation))  # the label locations
         ax.plot(x, average_channel_loss_estimation, 'b-', label='channel loss')
-        ax.set_title ('one hop (channel loss ~30%)', fontsize=20)
+        ax.set_title ('one hop (channel loss ~%d%%)' % getAverageChannelLoss (average_channel_loss_estimation), fontsize=20)
         ax.set_xlabel ('time', fontsize=20)
         ax.set_ylabel ('channel loss estimation', fontsize=20)
         ax.set_ylim([0, max (average_channel_loss_estimation) + 0.1])

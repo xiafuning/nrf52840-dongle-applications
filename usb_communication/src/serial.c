@@ -162,12 +162,21 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
 
     // time related variable definition
     clock_t frame_rx_timeout_start = 0;
-    uint32_t next_frame_rx_timeout = 60; // ms, hard coded
+    uint32_t next_frame_rx_timeout = 70; // ms, hard coded
+    uint32_t packet_rx_timeout = 1500; // ms, hard coded
+    clock_t packet_rx_timeout_start = 0;
+
+    // last fragment handle variables
+    bool last_fragment_handle = false;
+    int last_fragment_handle_drop_size = 0;
 
     init_reassembler();
 
+    packet_rx_timeout_start = clock();
     while (read_complete == false)
     {
+        if ((clock() - packet_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > packet_rx_timeout)
+            return 0;
         // read from serial port
         if (first_frame == true)
         {
@@ -196,8 +205,10 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
             non_frag_frame_tail_exist = false;
             first_frame = true;
         }
-        else
+        else if (last_fragment_handle == true)
         {
+            printf ("drop useless data\n");
+            last_fragment_handle = false;
             rx_num = 0;
             frame_rx_timeout_start = clock();
             do
@@ -206,10 +217,24 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
                 if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
                     return 0;
             }
+            while (rx_num < last_fragment_handle_drop_size);
+            continue;
+        }
+        else
+        {
+            rx_num = 0;
+            frame_rx_timeout_start = clock();
+            do
+            {
+                rx_num += read (fd, rx_buf + rx_num, 1);
+                if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
+                    break;
+            }
             while (rx_num < next_frame_size);
             // handle the case that first frame
             // is incomplete in the first rx
-            printf ("receive %d bytes\n", rx_num);
+            if (rx_num > 0)
+                printf ("receive %d bytes\n", rx_num);
             if (first_frame_tail_exist == true)
             {
                 next_frame_size = copy_frame_tail (rx_buf, rx_num);
@@ -217,6 +242,11 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
                 continue;
             }
         }
+
+        if (rx_num == 0)
+            continue;
+        else
+            print_payload (rx_buf, rx_num);
 
         // check if frame is correctly formatted
         if (is_frame_format_correct (rx_buf) == false)
@@ -259,6 +289,19 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
                      is_new_packet (rx_buf) == false &&
                      is_new_fragment (rx_buf) == true)
                 next_frame_size = read_frame (rx_buf, rx_num);
+            // handle last and second last fragment conflict
+            // contain magic number here!
+            else if (is_reassembler_running () == true &&
+                     is_new_packet (rx_buf) == false &&
+                     is_new_fragment (rx_buf) == false &&
+                     get_datagram_offset (rx_buf + 4) == 160 && // 0x14 << 3 = 160
+                     rx_num == 23)
+            {
+                last_fragment_handle = true;
+                // size of second last fragment payload: 93
+                last_fragment_handle_drop_size = 93 - 23;
+                continue;
+            }
             // other cases
             else
             {

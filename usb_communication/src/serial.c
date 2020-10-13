@@ -150,25 +150,23 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
     int rx_num = 0;
     uint8_t rx_buf[128];
     memset (rx_buf, 0, sizeof rx_buf);
-    bool first_frame = true;
-    bool first_frame_tail_exist = false;
-    bool non_frag_frame_tail_exist = false;
     bool read_complete = false;
-    uint8_t next_frame_size = 0;
     int ret = 0;
     uint8_t ack_packet[64];
     // construct ack packet
     uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)SERVER_ACK);
 
     // time related variable definition
-    clock_t frame_rx_timeout_start = 0;
-    uint32_t next_frame_rx_timeout = 70; // ms, hard coded
     uint32_t packet_rx_timeout = 1500; // ms, hard coded
     clock_t packet_rx_timeout_start = 0;
 
-    // last fragment handle variables
-    bool last_fragment_handle = false;
-    int last_fragment_handle_drop_size = 0;
+    uint8_t current_frame_length = 0;
+    uint8_t init_rx_size = 10;
+    uint16_t datagram_size = 0;
+    uint8_t fragment_num = 0;
+    uint8_t rx_num_order[MAX_FRAG_NUM];
+    memset (rx_num_order, 0, sizeof rx_num_order);
+    uint16_t sum = 0;
 
     init_reassembler();
 
@@ -178,70 +176,55 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         if ((clock() - packet_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > packet_rx_timeout)
             return 0;
         // read from serial port
-        if (first_frame == true)
+        rx_num = read (fd, rx_buf, init_rx_size);
+        if (rx_num > 0)
         {
-            rx_num = read (fd, rx_buf, 128);
-            if (rx_num > 0)
-                printf ("receive %d bytes\n", rx_num);
-            else if (rx_num == -1)
+            // fragmented packet
+            if (need_reassemble (rx_buf) == true)
             {
-                fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
-                break;
+                datagram_size = get_datagram_size (rx_buf);
+                fragment_num = calculate_fragment_num (datagram_size);
+                calculate_rx_num_order (rx_num_order, fragment_num, datagram_size);
+
+                if (is_first_fragment (rx_buf) == true)
+                    current_frame_length = rx_num_order[0];
+                else
+                {
+                    for (uint8_t i = 1; i < fragment_num; i++)
+                    {
+                        sum = 0;
+                        for (uint8_t j = 0; j < i; j++)
+                            if (j == 0)
+                                sum += rx_num_order[j] - FIRST_FRAG_HDR_SIZE;
+                            else
+                                sum += rx_num_order[j] - OTHER_FRAG_HDR_SIZE;
+                        if (sum == get_datagram_offset (rx_buf + 4))
+                        {
+                            current_frame_length = rx_num_order[i];
+                            break;
+                        }
+                    }
+                }
             }
-            else // no data received
-                return 0;
-        }
-        else if (non_frag_frame_tail_exist == true)
-        {
-            frame_rx_timeout_start = clock();
+            // non-fragmented/normal packet
+            else
+                current_frame_length = *rx_buf;
             do
             {
                 rx_num += read (fd, rx_buf + rx_num, 1);
-                if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
-                    return 0;
             }
-            while (rx_num < *rx_buf);
-            printf ("receive %d bytes total\n", rx_num);
-            non_frag_frame_tail_exist = false;
-            first_frame = true;
+            while (rx_num < current_frame_length);
+            printf ("receive %d bytes\n", rx_num);
         }
-        else if (last_fragment_handle == true)
+        else if (rx_num == -1)
         {
-            printf ("drop useless data\n");
-            last_fragment_handle = false;
-            rx_num = 0;
-            frame_rx_timeout_start = clock();
-            do
-            {
-                rx_num += read (fd, rx_buf + rx_num, 1);
-                if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
-                    return 0;
-            }
-            while (rx_num < last_fragment_handle_drop_size);
+            fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
+            break;
+        }
+        else if (is_reassembler_running() == true)
             continue;
-        }
         else
-        {
-            rx_num = 0;
-            frame_rx_timeout_start = clock();
-            do
-            {
-                rx_num += read (fd, rx_buf + rx_num, 1);
-                if ((clock() - frame_rx_timeout_start) * 1000 / CLOCKS_PER_SEC > next_frame_rx_timeout)
-                    break;
-            }
-            while (rx_num < next_frame_size);
-            // handle the case that first frame
-            // is incomplete in the first rx
-            if (rx_num > 0)
-                printf ("receive %d bytes\n", rx_num);
-            if (first_frame_tail_exist == true)
-            {
-                next_frame_size = copy_frame_tail (rx_buf, rx_num);
-                first_frame_tail_exist = false;
-                continue;
-            }
-        }
+            return 0;
 
         if (rx_num == 0)
             continue;
@@ -253,10 +236,6 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         {
             // if not, reset reassembler
             init_reassembler ();
-            first_frame = true;
-            first_frame_tail_exist = false;
-            non_frag_frame_tail_exist = false;
-            next_frame_size = 0;
             continue;
         }
 
@@ -264,6 +243,7 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         if (need_reassemble (rx_buf)) // fragmented packet
         {
             // send ack
+            printf ("send ACK\n");
             ret = write_serial_port (fd, ack_packet, ack_packet_length);
             if (ret == -1)
                 return 0;
@@ -277,47 +257,17 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
                 rx_num > FIRST_FRAG_DATA_OFFSET)
             {
                 start_new_reassemble (rx_buf);
-                if (first_frame == true)
-                    first_frame = false;
-                reassembler_t* reassembler = get_reassembler ();
-                if (rx_num < reassembler->rx_num_order[0])
-                    first_frame_tail_exist = true;
-                next_frame_size = read_frame (rx_buf, rx_num);
+                read_frame (rx_buf, rx_num);
             }
             // receive a fragment of a known packet
             else if (is_reassembler_running () == true &&
                      is_new_packet (rx_buf) == false &&
                      is_new_fragment (rx_buf) == true)
-                next_frame_size = read_frame (rx_buf, rx_num);
-            // handle last and second last fragment conflict
-            // contain magic number here!
-            else if (is_reassembler_running () == true &&
-                     is_new_packet (rx_buf) == false &&
-                     is_new_fragment (rx_buf) == false &&
-                     get_datagram_offset (rx_buf + 4) == 160 && // 0x14 << 3 = 160
-                     rx_num == 23)
-            {
-                last_fragment_handle = true;
-                // size of second last fragment payload: 93
-                last_fragment_handle_drop_size = 93 - 23;
-                continue;
-            }
+                read_frame (rx_buf, rx_num);
             // other cases
             else
             {
                 memset (rx_buf, 0, sizeof rx_buf);
-                continue;
-            }
-            // check if next frame size is valid
-            if (next_frame_size > sizeof rx_buf)
-            {
-                // if not, reset reassembler
-                printf ("incorrect next frame size\n");
-                init_reassembler ();
-                first_frame = true;
-                first_frame_tail_exist = false;
-                non_frag_frame_tail_exist = false;
-                next_frame_size = 0;
                 continue;
             }
             if (is_reassemble_complete () == true)
@@ -333,13 +283,6 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         }
         else // non-fragmented/normal packet
         {
-            if (*rx_buf != rx_num)
-            {
-                first_frame = false;
-                non_frag_frame_tail_exist = true;
-                next_frame_size = *rx_buf - rx_num;
-                continue;
-            }
             printf ("receive a packet\n");
             if (rx_frame_count != NULL)
                 (*rx_frame_count)++;

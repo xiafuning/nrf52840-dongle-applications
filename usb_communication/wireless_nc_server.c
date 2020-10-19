@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 
     // time related variable definition
     clock_t rx_timeout_start = 0;
-    uint32_t rx_timeout = 1500; // ms, hard coded
+    uint32_t rx_timeout = 1000; // ms, hard coded
 
     // decoder initialization
     // set finite field size
@@ -204,13 +204,7 @@ int main(int argc, char *argv[])
     print_payload (data_out, sizeof data_out);
 
     if (decoder.is_complete() == true)
-    {
         printf ("decode complete!\n");
-        // send ACK message
-        ret = write_serial_port (fd, ack_buf.packet, ack_buf.length);
-        if (ret < 0)
-            return -1;
-    }
     else
         printf ("decode failure!\n");
 

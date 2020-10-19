@@ -106,8 +106,6 @@ int main(int argc, char *argv[])
     // variable definitions
     uint32_t inter_frame_interval = 50000; // inter frame interval in us
     int ret;
-    bool decode_complete_ack = false;
-    int rx_num = 0;
     uint8_t rx_buf[MAX_SIZE];
     memset (rx_buf, 0, sizeof rx_buf);
     uint16_t tx_frame_count = 0;
@@ -231,30 +229,7 @@ int main(int argc, char *argv[])
         gettimeofday (&send_end, NULL);
         total_time_used += 1000000 * (send_end.tv_sec - send_start.tv_sec) +
                            send_end.tv_usec - send_start.tv_usec;
-
-        // check for ack from decoder
-        rx_num = read_serial_port (fd, rx_buf, NULL);
-        if (rx_num > 0 &&
-            strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE), SERVER_ACK) == 0)
-        {
-            printf ("receive ACK from decoder\n");
-            decode_complete_ack = true;
-            // send ack to relay node
-            uint8_t ack_packet_length = generate_ack_packet (ack_packet, (uint8_t*)CLIENT_ACK);
-            generate_normal_packet (&tx_packet[0], ack_packet, ack_packet_length);
-            ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
-            if (ret < 0)
-                return -1;
-            break;
-        }
-        else if (rx_num == -1)
-        {
-            fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
-            break;
-        }
     } // end of while
-    if (decode_complete_ack == false)
-        printf ("decode failure\n");
     printf ("packet total send: %u\n", tx_packet_count);
     printf ("frame total send: %u\n", tx_frame_count);
     return 0;

@@ -7,7 +7,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 
-
 #===========================================
 def autoLabel (rects, ax):
 #===========================================
@@ -47,8 +46,8 @@ def plotRetransmissionStat (data, fig, ax, measure_date):
     x = retx_stat.keys()  # the label locations
     ax.bar (x, retx_stat.values())
     ax.set_xticks (retx_stat.keys())
-    ax.set_title ('one hop (channel loss ~30%)', fontsize=20)
-    ax.set_xlabel ('number of retransmission', fontsize=20)
+    ax.set_title ('one hop (channel loss ~%d%%)' % getAverageChannelLoss (channel_loss_estimation), fontsize=20)
+    ax.set_xlabel ('number of transmission', fontsize=20)
     ax.set_ylabel ('percentage', fontsize=20)
     #ax.set_ylim([0,1])
     fig.savefig (fname='one_hop_%s_retx_stat.pdf' % measure_date, bbox_inches='tight')
@@ -130,7 +129,6 @@ def main():
     channel_loss_estimation = []
 
     average_no_coding_loss_rate = []
-    average_no_coding_tx_num = []
     average_nc_0_loss_rate = []
     average_nc_50_loss_rate = []
     average_nc_75_loss_rate = []
@@ -182,9 +180,7 @@ def main():
             no_coding_tx_num.append (data[index]['tx_num'])
             if len(no_coding_loss_rate) == 50:
                 average_no_coding_loss_rate.append (np.mean (no_coding_loss_rate))
-                average_no_coding_tx_num.append (np.mean (no_coding_tx_num))
                 no_coding_loss_rate = []
-                no_coding_tx_num = []
 
     labels = ['', 'OT ARQ', 'NC 4+0', 'NC 4+2', 'NC 4+3', 'NC 4+4']
 
@@ -204,7 +200,7 @@ def main():
         fig.savefig (fname='one_hop_%s_loss.pdf' % measure_date, bbox_inches='tight')
     # plot transmission statistics
     elif plot_tx == True:
-        ax.boxplot ([average_no_coding_tx_num, nc_0_tx_num, nc_50_tx_num, nc_75_tx_num, nc_100_tx_num, []], labels=x, showmeans=True)
+        ax.boxplot ([no_coding_tx_num, nc_0_tx_num, nc_50_tx_num, nc_75_tx_num, nc_100_tx_num, []], labels=x, showmeans=True)
         ax.set_ylabel ('number of transmission', fontsize=20)
         ax.set_title ('one hop (channel loss ~%d%%)' % getAverageChannelLoss (average_channel_loss_estimation), fontsize=20)
         ax.set_xticks(x)
@@ -213,7 +209,7 @@ def main():
         fig.savefig (fname='one_hop_%s_tx.pdf' % measure_date, bbox_inches='tight')
     # plot loss vs tx statistics
     elif plot_mix == True:
-        point_chart = ax.plot(np.mean (average_no_coding_loss_rate), np.mean (average_no_coding_tx_num), 'ro', label='OT ARQ', ms=10)
+        point_chart = ax.plot(np.mean (average_no_coding_loss_rate), np.mean (no_coding_tx_num), 'ro', label='OT ARQ', ms=10)
         point_chart = ax.plot(np.mean (average_nc_0_loss_rate), np.mean (nc_0_tx_num), 'b*-', label='NC 4+0', ms=10)
         point_chart = ax.plot(np.mean (average_nc_50_loss_rate), np.mean (nc_50_tx_num), 'b+-', label='NC 4+2', ms=10)
         point_chart = ax.plot(np.mean (average_nc_75_loss_rate), np.mean (nc_75_tx_num), 'bo-', label='NC 4+3', ms=10)
@@ -248,6 +244,7 @@ def main():
         ax.set_ylabel ('channel loss estimation', fontsize=20)
         ax.set_ylim([0, max (average_channel_loss_estimation) + 0.1])
         fig.savefig (fname='one_hop_%s_channel_loss_estimation.pdf' % measure_date, bbox_inches='tight')
+    # plot retransmission statistics
     elif plot_retx_stat == True:
         plotRetransmissionStat (data, fig, ax, measure_date)
 

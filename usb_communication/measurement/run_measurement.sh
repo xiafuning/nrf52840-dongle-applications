@@ -31,13 +31,13 @@ then
         ./one_hop_measurement.sh -s 256 -g 1 -l ${log_file_name} -n ${rounds_per_run} -t no
         sleep 2s
         ./one_hop_measurement.sh -s 64 -g 4 -r 0 -l ${log_file_name} -n ${rounds_per_run} -t nc
-        sleep 2s
+        sleep 1.5s
         ./one_hop_measurement.sh -s 64 -g 4 -r 50 -l ${log_file_name} -n ${rounds_per_run} -t nc
-        sleep 2s
+        sleep 1.5s
         ./one_hop_measurement.sh -s 64 -g 4 -r 75 -l ${log_file_name} -n ${rounds_per_run} -t nc
-        sleep 2s
+        sleep 1.5s
         ./one_hop_measurement.sh -s 64 -g 4 -r 100 -l ${log_file_name} -n ${rounds_per_run} -t nc
-        sleep 5s
+        sleep 2s
     done
 elif [[ $type = "two" ]]
 then

@@ -36,7 +36,7 @@ do
     echo "round $i"
     sudo ../build/wireless_nc_server -p /dev/ttyACM1 -s $symbol_size -g $gen_size -r $redundancy -l $log_file_name &
     sudo ../build/wireless_nc_client -p /dev/ttyACM0 -s $symbol_size -g $gen_size -r $redundancy  &>/dev/null
-    sleep 2s
+    sleep 1.5s
 done
 elif [[ $type = "no" ]]
 then

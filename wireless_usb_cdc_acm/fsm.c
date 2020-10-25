@@ -508,7 +508,11 @@ static void a_radio_tx_start(void * p_data)
 
 		// radio mac configuration
         m_data_req.dst_addr_mode = MAC_ADDR_SHORT;
-        m_data_req.dst_addr.short_address = CONFIG_OTHER_ADDRESS;
+        if (strcmp (&m_radio_tx_buffer[PAYLOAD_START_POSITION + 10], "relay_ack") == 0 ||
+            strcmp (&m_radio_tx_buffer[PAYLOAD_START_POSITION + 10], "server_ack") == 0)
+            m_data_req.dst_addr.short_address = CONFIG_ACK_ADDRESS;
+        else
+            m_data_req.dst_addr.short_address = CONFIG_OTHER_ADDRESS;
         m_data_req.dst_pan_id = CONFIG_PAN_ID;
         m_data_req.src_addr_mode = MAC_ADDR_SHORT;
         m_data_req.msdu = (uint8_t *)&m_radio_tx_buffer[PAYLOAD_START_POSITION];

@@ -64,6 +64,11 @@
 #define CONFIG_OTHER_ADDRESS 10
 #endif
 
+// <o> CONFIG_ACK_ADDRESS - ACK packet destination short address
+#ifndef CONFIG_ACK_ADDRESS
+#define CONFIG_ACK_ADDRESS 11
+#endif
+
 // </h> 
 //==========================================================
 

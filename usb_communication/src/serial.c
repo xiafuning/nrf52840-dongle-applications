@@ -144,7 +144,7 @@ tx_buf_t* serial_fragmentation (uint8_t* data, int length)
     return &m_tx_buf;
 }
 
-uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_count)
+uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_count, bool frame_only)
 {
     // parameter definitions
     int rx_num = 0;
@@ -231,6 +231,17 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         else
             print_payload (rx_buf, rx_num);
 
+        // update frame counter
+        if (rx_frame_count != NULL)
+            (*rx_frame_count)++;
+        // return the received frame
+        if (frame_only == true)
+        {
+            printf ("receive a frame\n");
+            memcpy (extract_buf, rx_buf, rx_num);
+            return (uint16_t)rx_num;
+        }
+
         // check if frame is correctly formatted
         if (is_frame_format_correct (rx_buf) == false)
         {
@@ -247,9 +258,6 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
             ret = write_serial_port (fd, ack_packet, ack_packet_length);
             if (ret == -1)
                 return 0;
-            // update frame counter
-            if (rx_frame_count != NULL)
-                (*rx_frame_count)++;
             // receive first frame of a packet
             // and make sure part of the payload is
             // included to avoid segmentation fault
@@ -284,8 +292,6 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
         else // non-fragmented/normal packet
         {
             printf ("receive a packet\n");
-            if (rx_frame_count != NULL)
-                (*rx_frame_count)++;
             memcpy (extract_buf, rx_buf, rx_num);
             return (uint16_t)rx_num;
         }
@@ -293,7 +299,7 @@ uint16_t read_serial_port (int fd, uint8_t* extract_buf, uint16_t* rx_frame_coun
     return 0;
 }
 
-bool wait_ack (int fd, uint16_t ack_timeout, char* ack_message)
+bool wait_ack (int fd, uint16_t ack_timeout)
 {
     uint8_t rx_buf[64];
     int rx_num = 0;
@@ -303,10 +309,10 @@ bool wait_ack (int fd, uint16_t ack_timeout, char* ack_message)
     while ((clock() - timeout_start) * 1000 / CLOCKS_PER_SEC < ack_timeout)
     {
         // check for ack from server
-        rx_num = read_serial_port (fd, rx_buf, NULL);
+        rx_num = read_serial_port (fd, rx_buf, NULL, false);
         if (rx_num > 0 &&
-            strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE),
-                    ack_message) == 0)
+            (strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE), RELAY_ACK) == 0 ||
+             strcmp ((const char*)(rx_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE), SERVER_ACK) == 0))
             return true;
         else if (rx_num == -1)
         {

@@ -16,6 +16,7 @@
 #define OTHER_FRAG_DATA_OFFSET  OTHER_FRAG_HDR_SIZE
 
 #define MAC_MAX_RETRIES         3
+#define FORWARDER_QUEUE_LENGTH  10
 
 typedef struct
 {
@@ -28,6 +29,15 @@ enum
     k_first_frag_type_mask = 0xc0,  // 0b1100_0000
     k_other_frag_type_mask = 0xe0,  // 0b1110_0000
 };
+
+typedef struct
+{
+    virtual_packet_t queue[FORWARDER_QUEUE_LENGTH];
+    uint8_t write_index;
+    uint8_t read_index;
+    uint8_t frame_tries;
+    bool idle;
+} lowpan_forwarder_t;
 
 /**
  * @brief check if a packet needs fragmentation
@@ -123,5 +133,31 @@ uint8_t get_tail_size (void);
  * @brief generate an ack packet
  */
 uint8_t generate_ack_packet (uint8_t* packet, uint8_t* ack);
+
+/**
+ * @brief check if a packet is ackonwledgement or not
+ */
+bool is_ack_packet (uint8_t* packet);
+
+
+/******************************************
+ * lowpan forwarder function declarations
+ *****************************************/
+
+/**
+ * @brief initialize forwarder
+ */
+void init_forwarder (lowpan_forwarder_t* forwarder);
+
+/**
+ * @brief check if forwarding queue is empty
+ */
+bool is_forwarder_empty (lowpan_forwarder_t* forwarder);
+
+/**
+ * @brief forward a frame
+ */
+bool forwarder_send (int fd, lowpan_forwarder_t* forwarder);
+
 
 #endif /* LOWPAN_H */

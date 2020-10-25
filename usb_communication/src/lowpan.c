@@ -8,6 +8,7 @@
 
 #include "lowpan.h"
 #include "config.h"
+#include "serial.h"
 
 // variable definitions
 static uint8_t m_fragment_num = 0;
@@ -261,25 +262,71 @@ uint8_t generate_ack_packet (uint8_t* packet, uint8_t* ack)
     if (*ack == 'c')
     {
         memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-        (uint8_t*)CLIENT_ACK,
-        sizeof CLIENT_ACK);
+                (uint8_t*)CLIENT_ACK,
+                sizeof CLIENT_ACK);
         length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof CLIENT_ACK;
     }
     else if (*ack == 'r')
     {
         memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-        (uint8_t*)RELAY_ACK,
-        sizeof RELAY_ACK);
+                (uint8_t*)RELAY_ACK,
+                sizeof RELAY_ACK);
         length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof RELAY_ACK;
     }
     else if (*ack == 's')
     {
         memcpy (packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-        (uint8_t*)SERVER_ACK,
-        sizeof SERVER_ACK);
+                (uint8_t*)SERVER_ACK,
+                sizeof SERVER_ACK);
         length = IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE + sizeof SERVER_ACK;
     }
     // set packet length in first byte of packet
     *packet = length;
     return length;
+}
+
+/**
+ * @brief generate an ack packet
+ */
+bool is_ack_packet (uint8_t* packet)
+{
+    if (strcmp ((char*)packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE, RELAY_ACK) == 0 ||
+        strcmp ((char*)packet + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE, SERVER_ACK) == 0)
+        return true;
+    else
+        return false;
+}
+
+/**
+ * @brief initialize forwarder
+ */
+void init_forwarder (lowpan_forwarder_t* forwarder)
+{
+   memset (forwarder, 0, sizeof *forwarder);
+   forwarder->idle = true;
+}
+
+/**
+ * @brief check if forwarding queue is empty
+ */
+bool is_forwarder_empty (lowpan_forwarder_t* forwarder)
+{
+    return forwarder->write_index == forwarder->read_index;
+}
+
+/**
+ * @brief forward a frame
+ */
+bool forwarder_send (int fd, lowpan_forwarder_t* forwarder)
+{
+    int ret = 0;
+    ret = write_serial_port (fd,
+                             forwarder->queue[forwarder->read_index].packet,
+                             forwarder->queue[forwarder->read_index].length);
+    forwarder->frame_tries++;
+    forwarder->idle = false;
+    if (ret < 0)
+        return -1;
+    else
+        return 0;
 }

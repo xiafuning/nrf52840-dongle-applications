@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -uo pipefail
 
 # default configuration
 symbol_size=4
@@ -34,18 +34,23 @@ then
 for (( i=0; i<$number_loops; i++ ))
 do
     echo "round $i"
-    sudo ../build/wireless_nc_server -p /dev/ttyACM1 -s $symbol_size -g $gen_size -r $redundancy -l $log_file_name &
+    sudo ../build/wireless_nc_server -p /dev/ttyACM1 -s $symbol_size -g $gen_size -r $redundancy -l ${log_file_name}.dump &
     sudo ../build/wireless_nc_client -p /dev/ttyACM0 -s $symbol_size -g $gen_size -r $redundancy  &>/dev/null
-    sleep 1.5s
+    sleep 1.2s
+    sudo killall -9  wireless_nc_server
+    sudo killall -9  wireless_nc_client
 done
 elif [[ $type = "no" ]]
 then
 for (( i=0; i<$number_loops; i++ ))
 do
     echo "round $i"
-    sudo ../build/wireless_no_coding_server -p /dev/ttyACM1 -s $symbol_size -g $gen_size &
-    sudo ../build/wireless_no_coding_client -p /dev/ttyACM0 -s $symbol_size -g $gen_size -l $log_file_name &>/dev/null
-    sleep 2s
+    sudo ../build/wireless_no_coding_server -p /dev/ttyACM1 -s $symbol_size -g $gen_size -l ${log_file_name}_no_dst.dump &
+    sudo ../build/wireless_no_coding_client -p /dev/ttyACM0 -s $symbol_size -g $gen_size -l ${log_file_name}_no_src.dump &>/dev/null
+    sleep 1.5s
+    sudo killall -9  wireless_no_coding_server
+    sudo killall -9  wireless_no_coding_client
+
 done
 else
     echo "wrong type!"

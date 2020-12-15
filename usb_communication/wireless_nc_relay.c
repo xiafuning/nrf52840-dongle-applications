@@ -18,11 +18,9 @@
 
 #include <kodo_rlnc/coders.hpp>
 
-#define USB_DEVICE "/dev/ttyACM0"
-#define MAX_SIZE 128
-
-static uint16_t rx_packet_count = 0;
-static uint16_t rx_frame_count = 0;
+#define USB_DEVICE  "/dev/ttyACM0"
+#define LOG_FILE    "log.dump"
+#define MAX_SIZE    128
 
 static struct option long_options[] =
 {
@@ -30,18 +28,22 @@ static struct option long_options[] =
     {"symbolSize",  required_argument, 0, 's'},
     {"genSize",     required_argument, 0, 'g'},
     {"recode",      no_argument,       0, 'r'},
+    {"logFile",     required_argument, 0, 'l'},
+    {"density",     no_argument,       0, 'd'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
 void usage(void)
 {
-    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --recode] [-h --help]\n");
+    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --recode] [-l --logFile <log file name>] [-d --density] [-h --help]\n");
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tsymbol size\t\t\tDefault: 4\n");
     printf ("\t-g --genSize\tgeneration size\t\t\tDefault: 10\n");
     printf ("\t-r --recode\tenable recoding\n");
+    printf ("\t-l --logFile\tlog file name\t\t\tDefault: log.dump\n");
+    printf ("\t-d --density\tenable sparse coding\n");
     printf ("\t-h --help\tthis help documetation\n");
 }
 
@@ -57,28 +59,47 @@ void print_nc_config (kodo_rlnc::pure_recoder* recoder,
     printf ("---------NC configuration---------\n");
 }
 
-void sigint_handler(int signal)
+int write_measurement_log (char* log_file_name,
+                           kodo_rlnc::pure_recoder* recoder,
+                           bool recode_enable,
+                           uint16_t rx_packet_count,
+                           bool sparse_enable)
 {
-    printf ("\npacket total forward: %u\n", rx_packet_count);
-    printf ("frame total forward: %u\n", rx_frame_count);
-    exit(0);
+    FILE* fp;
+    fp = fopen (log_file_name, "a+");
+    if (fp == NULL)
+    {
+        fprintf (stderr, "error %d opening %s: %s\n", errno, log_file_name, strerror (errno));
+        return -1;
+    }
+    if (sparse_enable == false)
+        fprintf(fp, "{\"type\": \"block_full\", \"gen_size\": %u, \"recode\": %d, \"fwd_num\": %u },\n",
+            recoder->symbols(),
+            recode_enable ? 1 : 0,
+            rx_packet_count);
+    else
+        fprintf(fp, "{\"type\": \"block_sparse\", \"gen_size\": %u, \"recode\": %d, \"fwd_num\": %u },\n",
+            recoder->symbols(),
+            recode_enable ? 1 : 0,
+            rx_packet_count);
+    fclose(fp);
+    return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    // set SIGINT handler
-    signal(SIGINT, sigint_handler);
-
     char* serial_port = (char*)USB_DEVICE;
+    char* log_file_name = (char*)LOG_FILE;
     uint32_t symbol_size = 4;
     uint32_t generation_size = 10;
     bool recode_enable = false;
+    bool sparse_enable = false;
 
     // cmd arguments parsing
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long (argc, argv, "p:s:g:h", long_options, &option_index)) != -1)
+    while ((opt = getopt_long (argc, argv, "p:s:g:rl:dh", long_options, &option_index)) != -1)
     {
         switch (opt)
         {
@@ -93,6 +114,12 @@ int main(int argc, char *argv[])
                 break;
             case 'r':
                 recode_enable = true;
+                break;
+            case 'l':
+                log_file_name = optarg;
+                break;
+            case 'd':
+                sparse_enable = true;
                 break;
             case 'h':
                 usage ();
@@ -117,8 +144,20 @@ int main(int argc, char *argv[])
     uint32_t inter_frame_interval = 50000; // inter frame interval in us
     int ret;
     int rx_num = 0;
+    uint16_t rx_packet_count = 0;
     uint8_t extract_buf[MAX_PACKET_SIZE];
     memset (extract_buf, 0, sizeof extract_buf);
+
+    uint8_t systematic_packet_coeff[4][4] = {
+                                            {1, 0, 0, 0},
+                                            {0, 1, 0, 0},
+                                            {0, 0, 1, 0},
+                                            {0, 0, 0, 1}
+                                            };
+
+    // time related variable definition
+    clock_t rx_timeout_start = 0;
+    uint32_t rx_timeout = 1100; // ms, hard coded
 
     // recoder initialization
     // set finite field size
@@ -147,38 +186,52 @@ int main(int argc, char *argv[])
     memset (packet, 0, sizeof packet);
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
+    uint32_t tx_packet_length = 0;
 
     print_nc_config (&recoder, recode_enable);
 
+    rx_timeout_start = clock();
     // relay operations
     while (true)
     {
+        if ((clock() - rx_timeout_start) * 1000 / CLOCKS_PER_SEC > rx_timeout)
+            break;
         // receive a packet
-        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
+        rx_num = read_serial_port (fd, extract_buf, &rx_packet_count, false);
         if (rx_num == 0)
             continue;
-        // check for ack from encoder
-        else if (rx_num > 0 &&
-                 strcmp ((const char*)(extract_buf + 10), CLIENT_ACK) == 0)
-        {
-            printf ("receive ACK from encoder/client\n");
-            break;
-        }
         else if (rx_num == -1)
         {
             fprintf (stderr, "error %d read fail: %s\n", errno,  strerror (errno));
             break;
         }
 
-        print_payload (extract_buf, rx_num);
-
         if (recode_enable == true)
         {
             printf ("recode a symbol\n");
-            // read symbol and coding coefficients into the recoder
-            recoder.consume_symbol (extract_buf + recoder.coefficient_vector_size() +
-                                    IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
-                                    extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
+            if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
+                                     UDPHC_TOTAL_SIZE +
+                                     sizeof (uint8_t) +
+                                     recoder.symbol_size())
+            {
+                // receive a systematic packet
+                // read symbol and coding coefficients into the recoder
+                recoder.consume_symbol (extract_buf + sizeof (uint8_t) +
+                                        IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                                        systematic_packet_coeff[*(extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE)]);
+            }
+            else if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
+                                     UDPHC_TOTAL_SIZE +
+                                     recoder.coefficient_vector_size() +
+                                     recoder.symbol_size())
+            {
+                // receive a coded packet
+                // read symbol and coding coefficients into the recoder
+                recoder.consume_symbol (extract_buf + recoder.coefficient_vector_size() +
+                                        IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
+                                        extract_buf + IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE);
+            }
+
             // generate recoding coefficients
             recoder.recoder_generate (recoder_coefficients);
             // write an encoded symbol based on the recoding coefficients
@@ -195,14 +248,17 @@ int main(int argc, char *argv[])
                     IPHC_TOTAL_SIZE + UDPHC_TOTAL_SIZE,
                     recoder_symbol,
                     sizeof recoder_symbol);
+            tx_packet_length = IPHC_TOTAL_SIZE +
+                               UDPHC_TOTAL_SIZE +
+                               sizeof recoder_symbol_coefficients +
+                               sizeof recoder_symbol;
             memset (extract_buf, 0, sizeof extract_buf);
-            rx_packet_count++;
         }
         else
         {
             // construct payload
             memcpy (packet, extract_buf, rx_num);
-            rx_packet_count++;
+            tx_packet_length = rx_num;
         }
 
         // forward packet
@@ -210,20 +266,19 @@ int main(int argc, char *argv[])
         if (need_fragmentation (rx_num) == true)
         {
             printf ("lowpan fragmentation needed\n");
-            do_fragmentation (tx_packet, packet, rx_num);
+            do_fragmentation (tx_packet, packet, tx_packet_length);
             for (uint8_t j = 0; j < get_fragment_num(); j++)
             {
                 ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
                 if (ret < 0)
                     return -1;
                 printf ("forward a frame\n");
-                if (j != get_fragment_num() - 1)
-                    usleep (inter_frame_interval);
+                usleep (inter_frame_interval);
             }
         }
         else
         {
-            generate_normal_packet (&tx_packet[0], packet, rx_num);
+            generate_normal_packet (&tx_packet[0], packet, tx_packet_length);
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;
@@ -231,6 +286,13 @@ int main(int argc, char *argv[])
         }
     } // end of while
     printf ("packet total forward: %u\n", rx_packet_count);
-    printf ("frame total forward: %u\n", rx_frame_count);
+    // write log to json file
+    ret = write_measurement_log (log_file_name,
+                                 &recoder,
+                                 recode_enable,
+                                 rx_packet_count,
+                                 sparse_enable);
+    if (ret < 0)
+        return -1;
     return 0;
 }

@@ -27,19 +27,24 @@ static struct option long_options[] =
     {"symbolSize",  required_argument, 0, 's'},
     {"genSize",     required_argument, 0, 'g'},
     {"redundancy",  required_argument, 0, 'r'},
+    {"logFile",     required_argument, 0, 'l'},
+    {"density",     no_argument,       0, 'd'},
+    {"recode",      no_argument,       0, 'c'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
 void usage(void)
 {
-    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>] [-l --logFile <log file name>][-h --help]\n");
+    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>] [-l --logFile <log file name>] [-d --density] [-c --recode] [-h --help]\n");
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tsymbol size\t\t\tDefault: 4\n");
     printf ("\t-g --genSize\tgeneration size\t\t\tDefault: 10\n");
     printf ("\t-r --redundancy\tredundancy in percent\t\tDefault: 20\n");
     printf ("\t-l --logFile\tlog file name\t\t\tDefault: log.dump\n");
+    printf ("\t-d --density\tenable sparse coding\n");
+    printf ("\t-c --recode\tenable recoding in relay\n");
     printf ("\t-h --help\tthis help documetation\n");
 }
 
@@ -57,7 +62,9 @@ void print_nc_config (kodo_rlnc::decoder* decoder,
 
 int write_measurement_log (char* log_file_name,
                            kodo_rlnc::decoder* decoder,
-                           float redundancy)
+                           float redundancy,
+                           bool sparse_enable,
+                           bool recode_enable)
 {
     FILE* fp;
     float loss_rate = 0;
@@ -70,11 +77,25 @@ int write_measurement_log (char* log_file_name,
     if (decoder->is_complete() == false)
         loss_rate = (float)(decoder->symbols() - decoder->rank()) / decoder->symbols();
 
-    fprintf(fp, "{\"type\": \"block_full\", \"gen_size\": %u, \"redundancy\": %.2f, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
+    if (sparse_enable == true)
+        fprintf(fp, "{\"type\": \"block_sparse\", \"gen_size\": %u, \"redundancy\": %.2f, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
             decoder->symbols(),
             redundancy,
             loss_rate,
             (unsigned)(decoder->symbols() * (1 + redundancy)));
+    else if (recode_enable == true)
+        fprintf(fp, "{\"type\": \"block_recode\", \"gen_size\": %u, \"redundancy\": %.2f, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
+            decoder->symbols(),
+            redundancy,
+            loss_rate,
+            (unsigned)(decoder->symbols() * (1 + redundancy)));
+    else
+        fprintf(fp, "{\"type\": \"block_full\", \"gen_size\": %u, \"redundancy\": %.2f, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
+            decoder->symbols(),
+            redundancy,
+            loss_rate,
+            (unsigned)(decoder->symbols() * (1 + redundancy)));
+
     fclose(fp);
     return 0;
 }
@@ -86,12 +107,14 @@ int main(int argc, char *argv[])
     uint32_t symbol_size = 4;
     uint32_t generation_size = 10;
     float redundancy = 0.2;
+    bool sparse_enable = false;
+    bool recode_enable = false;
 
     // cmd arguments parsing
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long (argc, argv, "p:s:g:r:l:h", long_options, &option_index)) != -1)
+    while ((opt = getopt_long (argc, argv, "p:s:g:r:l:dch", long_options, &option_index)) != -1)
     {
         switch (opt)
         {
@@ -109,6 +132,12 @@ int main(int argc, char *argv[])
                 break;
             case 'l':
                 log_file_name = optarg;
+                break;
+            case 'd':
+                sparse_enable = true;
+                break;
+            case 'c':
+                recode_enable = true;
                 break;
             case 'h':
                 usage ();
@@ -171,10 +200,10 @@ int main(int argc, char *argv[])
         if ((clock() - rx_timeout_start) * 1000 / CLOCKS_PER_SEC > rx_timeout)
             break;
         // receive a packet
-        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count);
+        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count, false);
         if (rx_num == 0)
             continue;
-        else if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
+        if ((unsigned)rx_num == IPHC_TOTAL_SIZE +
                                      UDPHC_TOTAL_SIZE +
                                      decoder.coefficient_vector_size() +
                                      decoder.symbol_size())
@@ -213,7 +242,7 @@ int main(int argc, char *argv[])
     printf ("frame total receive: %u\n", rx_frame_count);
 
     // write log to json file
-    ret = write_measurement_log (log_file_name, &decoder, redundancy);
+    ret = write_measurement_log (log_file_name, &decoder, redundancy, sparse_enable, recode_enable);
     if (ret < 0)
         return -1;
     return 0;

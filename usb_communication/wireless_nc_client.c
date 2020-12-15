@@ -26,18 +26,20 @@ static struct option long_options[] =
     {"symbolSize",  required_argument, 0, 's'},
     {"genSize",     required_argument, 0, 'g'},
     {"redundancy",  required_argument, 0, 'r'},
+    {"density",     no_argument,       0, 'd'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
 void usage(void)
 {
-    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>][-h --help]\n");
+    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>] [-d --density] [-h --help]\n");
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tsymbol size\t\t\tDefault: 4\n");
     printf ("\t-g --genSize\tgeneration size\t\t\tDefault: 10\n");
     printf ("\t-r --redundancy\tredundancy in percent\t\tDefault: 20\n");
+    printf ("\t-d --density\tenable sparse coding\n");
     printf ("\t-h --help\tthis help documetation\n");
 }
 
@@ -62,12 +64,13 @@ int main(int argc, char *argv[])
     uint32_t symbol_size = 4;
     uint32_t generation_size = 10;
     float redundancy = 0.2;
+    bool sparse_enable = false;
 
     // cmd arguments parsing
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long (argc, argv, "p:s:g:r:h", long_options, &option_index)) != -1)
+    while ((opt = getopt_long (argc, argv, "p:s:g:r:dh", long_options, &option_index)) != -1)
     {
         switch (opt)
         {
@@ -82,6 +85,9 @@ int main(int argc, char *argv[])
                 break;
             case 'r':
                 redundancy = (float)atoi (optarg) / 100;
+                break;
+            case 'd':
+                sparse_enable = true;
                 break;
             case 'h':
                 usage ();
@@ -122,6 +128,10 @@ int main(int argc, char *argv[])
     fifi::finite_field field = fifi::finite_field::binary8;
     // create an encoder
     kodo_rlnc::encoder encoder (field, generation_size, symbol_size);
+
+    // enable sparse coding
+    if (sparse_enable == true)
+        encoder.set_density (0.5);
 
     // set buffers
     uint8_t encoder_symbol[encoder.symbol_size()];

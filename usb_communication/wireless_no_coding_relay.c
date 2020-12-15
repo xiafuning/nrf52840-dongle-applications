@@ -43,25 +43,22 @@ void usage(void)
 }
 
 int write_measurement_log (char* log_file_name,
+                           uint16_t rx_frame_count,
                            uint16_t tx_frame_count,
                            uint32_t symbol_size,
-                           uint32_t generation_size,
-                           bool tx_success)
+                           uint32_t generation_size)
 {
     FILE* fp;
-    float loss_rate = 0;
     fp = fopen (log_file_name, "a+");
     if (fp == NULL)
     {
         fprintf (stderr, "error %d opening %s: %s\n", errno, log_file_name, strerror (errno));
         return -1;
     }
-    if (tx_success == false)
-        loss_rate = 1;
 
-    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"loss_rate\": %.2f, \"fwd_num\": %u },\n",
+    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"rx_num\": %u, \"fwd_num\": %u },\n",
             symbol_size * generation_size,
-            loss_rate,
+            rx_frame_count,
             tx_frame_count);
     fclose(fp);
     return 0;
@@ -151,7 +148,7 @@ int main(int argc, char *argv[])
     while ((clock() - rx_timeout_start) * 1000 / CLOCKS_PER_SEC < rx_timeout)
     {
         // receive a packet
-        rx_num = read_serial_port (fd, extract_buf, &rx_frame_count, true);
+        rx_num = read_serial_port (fd, extract_buf, NULL, true);
         if (rx_num > 0)
         {
             // receive an ack means a frame is successfully forwarded
@@ -174,6 +171,7 @@ int main(int argc, char *argv[])
                 ret = write_serial_port (fd, ack_packet, ack_packet_length);
                 if (ret == -1)
                     return 0;
+                rx_frame_count++;
                 // insert frame in forwarding queue
                 memcpy (forwarder.queue[forwarder.write_index].packet,
                         extract_buf,
@@ -221,16 +219,17 @@ int main(int argc, char *argv[])
             }
         }
     } // end of while
+
+    // write log to json file
+    write_measurement_log (log_file_name,
+                           rx_frame_count,
+                           tx_frame_count,
+                           symbol_size,
+                           generation_size);
+
     printf ("frame total receive: %u\n", rx_frame_count);
     printf ("frame total send: %u\n", tx_frame_count);
     printf ("frame total forward: %u\n", fwd_frame_count);
 
-    // write log to json file
-    write_measurement_log (log_file_name,
-                           tx_frame_count,
-                           symbol_size,
-                           generation_size,
-                           fwd_frame_count >= 4 ? true : false);
-    // magic number above: fragment number when symbol_size = 256!
     return 0;
 }

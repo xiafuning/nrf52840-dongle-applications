@@ -43,23 +43,18 @@ void usage(void)
 int write_measurement_log (char* log_file_name,
                            uint16_t tx_frame_count,
                            uint32_t symbol_size,
-                           uint32_t generation_size,
-                           bool tx_success)
+                           uint32_t generation_size)
 {
     FILE* fp;
-    float loss_rate = 0;
     fp = fopen (log_file_name, "a+");
     if (fp == NULL)
     {
         fprintf (stderr, "error %d opening %s: %s\n", errno, log_file_name, strerror (errno));
         return -1;
     }
-    if (tx_success == false)
-        loss_rate = 1;
 
-    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
+    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"tx_num\": %u },\n",
             symbol_size * generation_size,
-            loss_rate,
             tx_frame_count);
     fclose(fp);
     return 0;
@@ -121,19 +116,15 @@ int main(int argc, char *argv[])
     uint8_t tx_frame_tries = 0;
     uint16_t ack_rx_num = 0;
     uint16_t data_offset = 0;
-    uint16_t ack_timeout = 50; // ack timeout in ms
-    //uint32_t inter_frame_interval = 50000; // inter frame interval in us
+    uint16_t ack_timeout = 50;  // ack timeout in ms
     bool tx_frame_success = false;
-    bool tx_data_success = false;
+    clock_t tx_timeout_start = 0;
+    uint32_t tx_timeout = 1500; // ms, hard coded
 
     // set buffers
     uint8_t data_in[symbol_size * generation_size];
     // fill source data buffer with specific values
     memset (data_in, 'T', sizeof (data_in));
-
-    // set ack packet buffer
-    uint8_t ack_packet[MAX_SIZE];
-    memset (ack_packet, 0, sizeof ack_packet);
 
     // set data packet buffer
     uint32_t packet_length = symbol_size +
@@ -144,9 +135,12 @@ int main(int argc, char *argv[])
     virtual_packet_t tx_packet[MAX_FRAG_NUM];
     memset (tx_packet, 0, sizeof (virtual_packet_t) * MAX_FRAG_NUM);
 
+    tx_timeout_start = clock();
     // client operations
     while (tx_packet_count < generation_size)
     {
+        if ((clock() - tx_timeout_start) * 1000 / CLOCKS_PER_SEC > tx_timeout)
+            break;
         // construct packet
         set_ip_header (packet);
         set_udp_header (packet + IPHC_TOTAL_SIZE);
@@ -177,7 +171,7 @@ int main(int argc, char *argv[])
                     tx_frame_count++;
                     tx_frame_tries++;
                     // wait for ack
-                    tx_frame_success = wait_ack (fd, ack_timeout, (char*)SERVER_ACK);
+                    tx_frame_success = wait_ack (fd, ack_timeout);
                     if (tx_frame_success == true)
                     {
                         printf ("receive ACK from server\n");
@@ -211,7 +205,7 @@ int main(int argc, char *argv[])
                 tx_frame_count++;
                 tx_frame_tries++;
                 // wait for ack
-                tx_frame_success = wait_ack (fd, ack_timeout, (char*)SERVER_ACK);
+                tx_frame_success = wait_ack (fd, ack_timeout);
                 if (tx_frame_success == true)
                 {
                     printf ("receive ACK from server\n");
@@ -229,19 +223,10 @@ int main(int argc, char *argv[])
     printf ("frame total send: %u\n", tx_frame_count);
     printf ("ack total receive: %u\n", ack_rx_num);
 
-    // check if transmission is successful
-    if (need_fragmentation (packet_length) == true &&
-        ack_rx_num / generation_size == get_fragment_num())
-        tx_data_success = true;
-    else if (need_fragmentation (packet_length) == false &&
-             ack_rx_num == generation_size)
-        tx_data_success = true;
-
     // write log to json file
     write_measurement_log (log_file_name,
                            tx_frame_count,
                            symbol_size,
-                           generation_size,
-                           tx_data_success);
+                           generation_size);
     return 0;
 }

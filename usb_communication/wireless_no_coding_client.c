@@ -42,6 +42,7 @@ void usage(void)
 
 int write_measurement_log (char* log_file_name,
                            uint16_t tx_frame_count,
+                           uint16_t ack_rx_num,
                            uint32_t symbol_size,
                            uint32_t generation_size)
 {
@@ -53,9 +54,10 @@ int write_measurement_log (char* log_file_name,
         return -1;
     }
 
-    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"tx_num\": %u },\n",
+    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"tx_num\": %u, \"ack_rx_num\": %u },\n",
             symbol_size * generation_size,
-            tx_frame_count);
+            tx_frame_count,
+            ack_rx_num);
     fclose(fp);
     return 0;
 }
@@ -164,7 +166,7 @@ int main(int argc, char *argv[])
                 tx_frame_success = false;
                 while (tx_frame_tries < (MAC_MAX_RETRIES + 1))
                 {
-                    printf ("send a frame\n");
+                    printf ("[client] send a frame\n");
                     ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
                     if (ret < 0)
                         return -1;
@@ -174,7 +176,7 @@ int main(int argc, char *argv[])
                     tx_frame_success = wait_ack (fd, ack_timeout);
                     if (tx_frame_success == true)
                     {
-                        printf ("receive ACK from server\n");
+                        printf ("[client] receive ACK from server\n");
                         ack_rx_num++;
                         break;
                     }
@@ -198,7 +200,7 @@ int main(int argc, char *argv[])
             tx_frame_success = false;
             while (tx_frame_tries < (MAC_MAX_RETRIES + 1))
             {
-                printf ("send a packet\n");
+                printf ("[client] send a packet\n");
                 ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
                 if (ret < 0)
                     return -1;
@@ -208,7 +210,7 @@ int main(int argc, char *argv[])
                 tx_frame_success = wait_ack (fd, ack_timeout);
                 if (tx_frame_success == true)
                 {
-                    printf ("receive ACK from server\n");
+                    printf ("[client] receive ACK from server\n");
                     ack_rx_num++;
                     break;
                 }
@@ -219,13 +221,14 @@ int main(int argc, char *argv[])
         // reset packet buffer
         memset (packet, 0, sizeof packet);
     } // end of while
-    printf ("packet total send: %u\n", tx_packet_count);
-    printf ("frame total send: %u\n", tx_frame_count);
-    printf ("ack total receive: %u\n", ack_rx_num);
+    printf ("[client] packet total send: %u\n", tx_packet_count);
+    printf ("[client] frame total send: %u\n", tx_frame_count);
+    printf ("[client] ack total receive: %u\n", ack_rx_num);
 
     // write log to json file
     write_measurement_log (log_file_name,
                            tx_frame_count,
+                           ack_rx_num,
                            symbol_size,
                            generation_size);
     return 0;

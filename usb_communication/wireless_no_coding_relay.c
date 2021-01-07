@@ -45,6 +45,7 @@ void usage(void)
 int write_measurement_log (char* log_file_name,
                            uint16_t rx_frame_count,
                            uint16_t tx_frame_count,
+                           uint16_t fwd_frame_count,
                            uint32_t symbol_size,
                            uint32_t generation_size)
 {
@@ -56,10 +57,11 @@ int write_measurement_log (char* log_file_name,
         return -1;
     }
 
-    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"rx_num\": %u, \"fwd_num\": %u },\n",
+    fprintf(fp, "{\"type\": \"no_coding\", \"data_size\": %u, \"rx_num\": %u, \"fwd_num\": %u, \"ack_rx_num\": %u },\n",
             symbol_size * generation_size,
             rx_frame_count,
-            tx_frame_count);
+            tx_frame_count,
+            fwd_frame_count);
     fclose(fp);
     return 0;
 }
@@ -155,7 +157,7 @@ int main(int argc, char *argv[])
             // reset forwarder
             if (is_ack_packet (extract_buf) == true)
             {
-                printf ("forward a frame\n");
+                printf ("[relay] forward a frame\n");
                 forwarder.idle = true;
                 forwarder.read_index++;
                 if (forwarder.read_index == FORWARDER_QUEUE_LENGTH)
@@ -167,7 +169,7 @@ int main(int argc, char *argv[])
             else
             {
                 // send ack
-                printf ("send ACK\n");
+                printf ("[relay] send ACK\n");
                 ret = write_serial_port (fd, ack_packet, ack_packet_length);
                 if (ret == -1)
                     return 0;
@@ -224,12 +226,13 @@ int main(int argc, char *argv[])
     write_measurement_log (log_file_name,
                            rx_frame_count,
                            tx_frame_count,
+                           fwd_frame_count,
                            symbol_size,
                            generation_size);
 
-    printf ("frame total receive: %u\n", rx_frame_count);
-    printf ("frame total send: %u\n", tx_frame_count);
-    printf ("frame total forward: %u\n", fwd_frame_count);
+    printf ("[relay] frame total receive: %u\n", rx_frame_count);
+    printf ("[relay] frame total send: %u\n", tx_frame_count);
+    printf ("[relay] frame total forward: %u\n", fwd_frame_count);
 
     return 0;
 }

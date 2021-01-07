@@ -170,12 +170,12 @@ int main(int argc, char *argv[])
         }
     } // end of while
     if (rx_success == true)
-        printf ("receive complete!\n");
+        printf ("[server] receive complete!\n");
     else
-        printf ("receive failure!\n");
+        printf ("[server] receive failure!\n");
 
-    printf ("packet total receive: %u\n", rx_packet_count);
-    printf ("frame total receive: %u\n", rx_frame_count);
+    printf ("[server] packet total receive: %u\n", rx_packet_count);
+    printf ("[server] frame total receive: %u\n", rx_frame_count);
 
     // write log to json file
     write_measurement_log (log_file_name,

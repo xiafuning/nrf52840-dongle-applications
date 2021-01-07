@@ -88,7 +88,7 @@ int write_measurement_log (char* log_file_name,
             decoder->symbols(),
             redundancy,
             loss_rate,
-            (unsigned)(decoder->symbols() * (1 + redundancy)));
+            (unsigned)(decoder->symbols() * (1 + redundancy / 2)));
     else
         fprintf(fp, "{\"type\": \"block_full\", \"gen_size\": %u, \"redundancy\": %.2f, \"loss_rate\": %.2f, \"tx_num\": %u },\n",
             decoder->symbols(),
@@ -233,13 +233,13 @@ int main(int argc, char *argv[])
     print_payload (data_out, sizeof data_out);
 
     if (decoder.is_complete() == true)
-        printf ("decode complete!\n");
+        printf ("[server] decode complete!\n");
     else
-        printf ("decode failure!\n");
+        printf ("[server] decode failure!\n");
 
-    printf ("decoder rank: %u\n", decoder.rank());
-    printf ("packet total receive: %u\n", rx_packet_count);
-    printf ("frame total receive: %u\n", rx_frame_count);
+    printf ("[server] decoder rank: %u\n", decoder.rank());
+    printf ("[server] packet total receive: %u\n", rx_packet_count);
+    printf ("[server] frame total receive: %u\n", rx_frame_count);
 
     // write log to json file
     ret = write_measurement_log (log_file_name, &decoder, redundancy, sparse_enable, recode_enable);

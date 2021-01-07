@@ -27,19 +27,21 @@ static struct option long_options[] =
     {"genSize",     required_argument, 0, 'g'},
     {"redundancy",  required_argument, 0, 'r'},
     {"density",     no_argument,       0, 'd'},
+    {"recode",      no_argument,       0, 'c'},
     {"help",        no_argument,       0, 'h'},
     {0, 0, 0, 0}
 };
 
 void usage(void)
 {
-    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>] [-d --density] [-h --help]\n");
+    printf ("Usage: [-p --port <serial port number>] [-s --symbolSize <symbol size>] [-g --genSize <generation size>] [-r --redundancy <redundancy in percent>] [-d --density] [-c --recode] [-h --help]\n");
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tsymbol size\t\t\tDefault: 4\n");
     printf ("\t-g --genSize\tgeneration size\t\t\tDefault: 10\n");
     printf ("\t-r --redundancy\tredundancy in percent\t\tDefault: 20\n");
     printf ("\t-d --density\tenable sparse coding\n");
+    printf ("\t-c --recode\tenable recoding\n");
     printf ("\t-h --help\tthis help documetation\n");
 }
 
@@ -65,12 +67,13 @@ int main(int argc, char *argv[])
     uint32_t generation_size = 10;
     float redundancy = 0.2;
     bool sparse_enable = false;
+    bool recode_enable = false;
 
     // cmd arguments parsing
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long (argc, argv, "p:s:g:r:dh", long_options, &option_index)) != -1)
+    while ((opt = getopt_long (argc, argv, "p:s:g:r:dch", long_options, &option_index)) != -1)
     {
         switch (opt)
         {
@@ -88,6 +91,9 @@ int main(int argc, char *argv[])
                 break;
             case 'd':
                 sparse_enable = true;
+                break;
+            case 'c':
+                recode_enable = true;
                 break;
             case 'h':
                 usage ();
@@ -110,13 +116,17 @@ int main(int argc, char *argv[])
     }
 
     // variable definitions
-    uint32_t inter_frame_interval = 50000; // inter frame interval in us
+    uint32_t inter_frame_interval = 30000; // inter frame interval in us
     int ret;
     uint8_t rx_buf[MAX_SIZE];
     memset (rx_buf, 0, sizeof rx_buf);
     uint16_t tx_frame_count = 0;
     uint16_t tx_packet_count = 0;
-    uint16_t total_tx_num = generation_size * (1 + redundancy);
+    uint16_t total_tx_num = 0;
+    if (recode_enable == false)
+        total_tx_num = generation_size * (1 + redundancy);
+    else
+        total_tx_num = generation_size * (1 + redundancy / 2);
     // time related variables
     struct timeval send_start, send_end;
     memset (&send_start, 0, sizeof send_start);
@@ -210,14 +220,14 @@ int main(int argc, char *argv[])
         // fragmentation
         if (need_fragmentation (tx_packet_length) == true)
         {
-            printf ("lowpan fragmentation needed\n");
+            printf ("[client] lowpan fragmentation needed\n");
             do_fragmentation (tx_packet, packet, tx_packet_length);
             for (uint8_t j = 0; j < get_fragment_num(); j++)
             {
                 ret = write_serial_port (fd, tx_packet[j].packet, tx_packet[j].length);
                 if (ret < 0)
                     return -1;
-                printf ("send a frame\n");
+                printf ("[client] send a frame\n");
                 tx_frame_count++;
                 usleep (inter_frame_interval);
             }
@@ -229,7 +239,7 @@ int main(int argc, char *argv[])
             ret = write_serial_port (fd, tx_packet[0].packet, tx_packet[0].length);
             if (ret < 0)
                 return -1;
-            printf ("send a packet\n");
+            printf ("[client] send a packet\n");
             tx_frame_count++;
             tx_packet_count++;
             usleep (inter_frame_interval);
@@ -240,7 +250,7 @@ int main(int argc, char *argv[])
         total_time_used += 1000000 * (send_end.tv_sec - send_start.tv_sec) +
                            send_end.tv_usec - send_start.tv_usec;
     } // end of while
-    printf ("packet total send: %u\n", tx_packet_count);
-    printf ("frame total send: %u\n", tx_frame_count);
+    printf ("[client] packet total send: %u\n", tx_packet_count);
+    printf ("[client] frame total send: %u\n", tx_frame_count);
     return 0;
 }

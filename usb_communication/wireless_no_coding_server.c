@@ -37,7 +37,7 @@ void usage(void)
     printf ("Options:\n");
     printf ("\t-p --port\tserial port number to open\tDefault: /dev/ttyACM0\n");
     printf ("\t-s --symbolSize\tpayload size\t\t\tDefault: 4\n");
-    printf ("\t-g --genSize\tnumber of packets to be sent\t\t\tDefault: 10\n");
+    printf ("\t-g --genSize\tnumber of packets to be sent\tDefault: 10\n");
     printf ("\t-l --logFile\tlog file name\t\t\tDefault: log.dump\n");
     printf ("\t-h --help\tthis help documetation\n");
 }

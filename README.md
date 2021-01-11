@@ -30,8 +30,8 @@ wireless_no_coding_server
 This application is used to measure the channel condition between two Dongle boards.
 #### Usage
 ```bash
-cd usb_communication
-sudo ./build/packet_loss_measurement --port <serial port> --mode <mode>
+$ cd usb_communication
+$ sudo ./build/packet_loss_measurement --port <serial port> --mode <mode>
 ```
 Check ```./build/packet_loss_measurement -h``` for more details.
 
@@ -39,8 +39,8 @@ Check ```./build/packet_loss_measurement -h``` for more details.
 This application implements network coding (block NC, sparse NC, NC with recoding) and acts as the client.
 #### Usage
 ```bash
-cd usb_communication
-sudo ./build/wireless_nc_client -p <serial port> -s <symbol size> -g <generation size> -r <redundancy>
+$ cd usb_communication
+$ sudo ./build/wireless_nc_client -p <serial port> -s <symbol size> -g <generation size> -r <redundancy>
 ```
 Check ```./build/wireless_nc_client -h``` for more details.
 
@@ -48,8 +48,8 @@ Check ```./build/wireless_nc_client -h``` for more details.
 This application acts as the relay.
 #### Usage
 ```bash
-cd usb_communication
-sudo ./build/wireless_nc_relay -p <serial port> -s <symbol size> -g <generation size> -r <redundancy> -l <log file name>
+$ cd usb_communication
+$ sudo ./build/wireless_nc_relay -p <serial port> -s <symbol size> -g <generation size> -r <redundancy> -l <log file name>
 ```
 Check ```./build/wireless_nc_relay -h``` for more details.
 
@@ -57,8 +57,8 @@ Check ```./build/wireless_nc_relay -h``` for more details.
 This application applies a smart relay mechanism, relay application will only forward the received fragments if the recoder is full rank.
 #### Usage
 ```bash
-cd usb_communication
-sudo ./build/wireless_nc_relay_smart -p <serial port> -s <symbol size> -g <generation size> -r <redundancy> -l <log file name>
+$ cd usb_communication
+$ sudo ./build/wireless_nc_relay_smart -p <serial port> -s <symbol size> -g <generation size> -r <redundancy> -l <log file name>
 ```
 Check ```./build/wireless_nc_relay_smart -h``` for more details.
 
@@ -66,8 +66,8 @@ Check ```./build/wireless_nc_relay_smart -h``` for more details.
 This application acts as the server and handles the decoding process.
 #### Usage
 ```bash
-cd usb_communication
-sudo ./build/wireless_nc_server -p <serial port> -s <symbol size> -g <generation size> -r <redundancy> -l <log file name>
+$ cd usb_communication
+$ sudo ./build/wireless_nc_server -p <serial port> -s <symbol size> -g <generation size> -r <redundancy> -l <log file name>
 ```
 Check ```./build/wireless_nc_server -h``` for more details.
 
@@ -75,8 +75,8 @@ Check ```./build/wireless_nc_server -h``` for more details.
 This set of programs act as the client/relay/server applications which implement OTARQ mechanism.
 #### Usage
 ```bash
-cd usb_communication
-sudo ./build/<app name> -p <serial port> -s <symbol size> -g <generation size> -l <log file name>
+$ cd usb_communication
+$ sudo ./build/<app name> -p <serial port> -s <symbol size> -g <generation size> -l <log file name>
 ```
 Check ```./build/<app name> -h``` for more details.
 
